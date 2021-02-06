@@ -2,11 +2,13 @@
  */
 package dk.cintix.tinyserver.rest.http;
 
+import dk.cintix.tinyserver.rest.http.request.RestHttpRequest;
 import dk.cintix.tinyserver.events.HttpRequestEvents;
 import dk.cintix.tinyserver.events.HttpNotificationEvents;
 import dk.cintix.tinyserver.events.HttpConnectionEvents;
 import dk.cintix.tinyserver.rest.RestClient;
 import dk.cintix.tinyserver.rest.RestEndPoint;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.ByteBuffer;
@@ -149,9 +151,9 @@ public abstract class RestHttpServer {
         SocketChannel client = mySocket.accept();
         RestClient restClient = new RestClient(client);
         key.attach(restClient.getSessionId());
-        
+
         clientSessions.put(restClient.getSessionId(), restClient);
-        
+
         client.configureBlocking(false);
         client.register(selector, SelectionKey.OP_READ, restClient.getSessionId());
         connectedEvent(restClient);
@@ -160,15 +162,92 @@ public abstract class RestHttpServer {
     private void handleRead(SelectionKey key) throws Exception {
         String sessionId = (key.attachment() != null) ? key.attachment().toString() : null;
         SocketChannel client = (SocketChannel) key.channel();
+        RestClient restClient = clientSessions.get(sessionId);
+
         ByteBuffer buffer = ByteBuffer.allocate(1024);
-        
+
         int read = client.read(buffer);
         if (read == -1) {
             handleDisconnect(serverSocketChannel, key);
         }
         String data = new String(buffer.array()).trim();
+
         if (data.length() > 0) {
             notifyEvent(data);
+            RestHttpRequest request = parseRequest(restClient, client, data);
+            System.out.println("request : " + request);
+            for (String hKey : request.getHeaders().keySet()) {
+                System.out.println("Key: " + hKey + " = " + request.getHeader(hKey));
+            }
+        }
+
+    }
+
+    private RestHttpRequest parseRequest(RestClient restClient, SocketChannel client, String headerData) throws Exception {
+        final Map<String, String> headers = new LinkedHashMap<>();
+        final Map<String, String> queryStrings = new LinkedHashMap<>();
+        final Map<String, String> postFields = new LinkedHashMap<>();
+        final InputStream inputStream = client.socket().getInputStream();
+
+        String contextPath = "";
+        String method = "GET";
+        String[] requestLines = headerData.split("\n");
+        String[] methodAndPath = requestLines[0].split(" ");
+        int linesProcessed = 0;
+
+        method = methodAndPath[0].toUpperCase();
+        for (int index = 1; index < methodAndPath.length - 1; index++) {
+            contextPath += methodAndPath[index] + " ";
+        }
+
+        contextPath.trim();
+        parseQueryStrings(contextPath, queryStrings);
+
+        linesProcessed = parseHeaderKeys(requestLines, headers, linesProcessed);
+        parsePostFields(linesProcessed, requestLines, postFields);
+
+        RestHttpRequest httpRequest = new RestHttpRequest(headers, queryStrings, postFields, inputStream, method, contextPath);
+        requestEvent(restClient, httpRequest);
+
+        return httpRequest;
+    }
+
+    private void parsePostFields(int linesProcessed, String[] requestLines, final Map<String, String> postFields) {
+        if (linesProcessed < (requestLines.length - 1)) {
+            String[] postParams = requestLines[linesProcessed++].split("&");
+            for (int index = 0; index < postParams.length; index++) {
+                if (postParams[index].contains("=")) {
+                    String[] keyValue = postParams[index].split("=");
+                    postFields.put(keyValue[0], (keyValue[1] != null) ? keyValue[1].trim() : "");
+                }
+            }
         }
     }
+
+    private void parseQueryStrings(String contextPath, final Map<String, String> queryStrings) {
+        if (contextPath.contains("?")) {
+            int offset = contextPath.indexOf("?");
+            String queryStringLine = contextPath.substring(offset);
+            String[] queryStrins = queryStringLine.split("&");
+            for (int index = 0; index < queryStrins.length; index++) {
+                if (queryStrins[index].contains("=")) {
+                    String[] keyValue = queryStrins[index].split("=");
+                    queryStrings.put(keyValue[0], (keyValue[1] != null) ? keyValue[1].trim() : "");
+                }
+            }
+        }
+    }
+
+    private int parseHeaderKeys(String[] requestLines, final Map<String, String> headers, int linesProcessed) {
+        for (int index = 1; index < requestLines.length; index++) {
+            if (requestLines[index] == null || requestLines[index] == "") {
+                break;
+            }
+            String[] keyValue = requestLines[index].split(":");
+            headers.put(keyValue[0], (keyValue[1] != null) ? keyValue[1].trim() : "");
+            linesProcessed++;
+        }
+        return linesProcessed;
+    }
+
 }

@@ -3,7 +3,7 @@
 package dk.cintix.tinyserver.events;
 
 import dk.cintix.tinyserver.rest.RestClient;
-import dk.cintix.tinyserver.rest.http.RestHttpRequest;
+import dk.cintix.tinyserver.rest.http.request.RestHttpRequest;
 
 /**
  *
