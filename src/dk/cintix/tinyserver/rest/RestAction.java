@@ -2,7 +2,10 @@
  */
 package dk.cintix.tinyserver.rest;
 
+import dk.cintix.tinyserver.rest.annotations.Inject;
+import dk.cintix.tinyserver.rest.http.request.RestHttpRequest;
 import dk.cintix.tinyserver.rest.response.Response;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.text.SimpleDateFormat;
@@ -35,8 +38,18 @@ public class RestAction {
         return endpoint;
     }
 
-    public Response process() {
+    public Response process(RestHttpRequest request) {
         try {
+
+            for (Field field : endpoint.getObject().getClass().getDeclaredFields()) {
+                if (field.isAnnotationPresent(Inject.class)) {
+                    if (field.getType().equals(RestHttpRequest.class)) {
+                        field.setAccessible(true);
+                        field.set(endpoint.getObject(), request);
+                    }
+                }
+            }
+
             Method method = endpoint.getMethod();
             Parameter[] parameterTypes = method.getParameters();
             Object[] methodArguments = new Object[parameterTypes.length];

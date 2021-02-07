@@ -22,12 +22,12 @@ public class HelloWorldRestEndPoint {
     @Inject
     RestHttpRequest request;
 
-    @Action(path = "/{name}")
+    @Action(path = "{name}")
     public Response sayHelloBack(String name) {
         return new Response().OK().model(new ResponseModel("Hello " + name));
     }
 
-    @Action(path = "/{name}/age/{age}")
+    @Action(path = "{name}/age/{age}")
     public Response sayHelloBackWithAge(String name, int age) {
         Calendar calendar = GregorianCalendar.getInstance();
         calendar.setTime(new Date());
@@ -35,13 +35,14 @@ public class HelloWorldRestEndPoint {
         return new Response().OK().model(new ResponseModel("Hello " + name + " your " + age + " old and born in " + calendar.get(Calendar.YEAR)));
     }
 
-    @Action(path = "/world")
+    @Action(path = "world")
     public Response sayHelloToTheWorld() {
+        System.out.println("request: " + request);
         return new Response().OK().ContentType("text/plain").model(new ResponseModel("Hello everyone!"));
     }
 
     @POST
-    @Action(path = "/")
+    @Action
     public Response register(Person person) {
         System.out.println("person " + person);
         return new Response().OK();

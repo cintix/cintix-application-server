@@ -55,10 +55,18 @@ public abstract class RestHttpServer {
     private volatile boolean running = true;
 
     public RestHttpServer() {
-        pathMapping.put("get", new LinkedHashMap<>());
-        pathMapping.put("put", new LinkedHashMap<>());
-        pathMapping.put("post", new LinkedHashMap<>());
-        pathMapping.put("delete", new LinkedHashMap<>());
+        if (!pathMapping.containsKey("get")) {
+            pathMapping.put("get", new LinkedHashMap<>());
+        }
+        if (!pathMapping.containsKey("put")) {
+            pathMapping.put("put", new LinkedHashMap<>());
+        }
+        if (!pathMapping.containsKey("post")) {
+            pathMapping.put("post", new LinkedHashMap<>());
+        }
+        if (!pathMapping.containsKey("delete")) {
+            pathMapping.put("delete", new LinkedHashMap<>());
+        }
     }
 
     public boolean isRunning() {
@@ -127,7 +135,7 @@ public abstract class RestHttpServer {
         serverSocketChannel.register(selector, validOps, null);
         notifyEvent("Server start on " + address.toString());
         notifyEvent("Listering...");
-                
+
         while (running) {
             int amount = selector.select(3000);
             Set<SelectionKey> selectedKeys = selector.selectedKeys();
@@ -265,11 +273,11 @@ public abstract class RestHttpServer {
 
     private Response handleRequestMapping(Map<String, Map<String, RestEndpoint>> pathMapping, RestHttpRequest request) throws Exception {
         String contextPath = request.getContextPath();
-        Map<String, RestEndpoint> requestMap = pathMapping.get(request.getMethod().toUpperCase());
+        Map<String, RestEndpoint> requestMap = pathMapping.get(request.getMethod().toLowerCase());
         RestAction restAction = locateEndpint(requestMap, contextPath.trim());
 
         if (restAction != null) {
-            return restAction.process();
+            return restAction.process(request);
         } else {
             return new Response().NotFound();
         }
@@ -341,7 +349,7 @@ public abstract class RestHttpServer {
                 httpMethodMap.put(urlPattern, new RestEndpoint(base + actionPath, method, endpoint));
                 httpMethodMap.put(base + actionPath, new RestEndpoint(base + actionPath, method, endpoint));
                 pathMapping.put(httpMethod, httpMethodMap);
-                
+
             }
         }
 
