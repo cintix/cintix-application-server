@@ -157,6 +157,7 @@ public abstract class RestHttpServer {
         key.cancel();
 
         RestClient restClient = clientSessions.get(clientSession.getSessionId());
+        clientSessions.remove(clientSession.getSessionId());
         disconnectedEvent(restClient);
     }
 
@@ -185,10 +186,12 @@ public abstract class RestHttpServer {
         client.write(buffer);
         InternalClientSession newSession = new InternalClientSession(clientSession.getSessionId());
         client.close();
-        key.cancel();
+        handleDisconnect(key);
     }
 
     private void handleRead(SelectionKey key) throws Exception {
+        System.out.println("clientSessions " + clientSessions.size());
+
         InternalClientSession clientSession = readAttachment(key);
         SocketChannel client = (SocketChannel) key.channel();
         RestClient restClient = clientSessions.get(clientSession.getSessionId());
