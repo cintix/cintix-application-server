@@ -23,3 +23,40 @@ DNT: 1
 Connection: keep-alive
 Upgrade-Insecure-Requests: 1
 Sec-GPC: 1
+[LOG][2021-02-07 16:14:18.257] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 16:14:18.257] Listering...
+[LOG][2021-02-07 16:14:29.977] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:85.0) Gecko/20100101 Firefox/85.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: da,en-US;q=0.7,en;q=0.3
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-02-07 16:15:25.970] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 16:15:25.971] Listering...
+[LOG][2021-02-07 16:15:28.039] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:85.0) Gecko/20100101 Firefox/85.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: da,en-US;q=0.7,en;q=0.3
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-02-07 16:15:59.769] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 16:15:59.769] Listering...
+[LOG][2021-02-07 16:16:00.544] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:85.0) Gecko/20100101 Firefox/85.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: da,en-US;q=0.7,en;q=0.3
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0

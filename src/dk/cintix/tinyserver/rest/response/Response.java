@@ -3,12 +3,15 @@
 package dk.cintix.tinyserver.rest.response;
 
 import com.google.gson.Gson;
-import dk.cintix.tinyserver.io.ByteMemoryStream;
-import java.io.ByteArrayOutputStream;
+import dk.cintix.tinyserver.io.memory.ByteMemoryStream;
+import dk.cintix.tinyserver.model.ModelGenerator;
+import dk.cintix.tinyserver.model.generators.JSONGenerator;
+import dk.cintix.tinyserver.model.generators.TextGenerator;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  *
@@ -16,12 +19,29 @@ import java.util.Map;
  */
 public class Response {
 
+    private static Map<String, ModelGenerator> contextGenerators = new TreeMap<>();
     private SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z");
     private final Gson gson = new Gson();
 
     private int status = 200;
     private Map<String, String> header = new LinkedHashMap<>();
     private byte[] content = new byte[0];
+    private String contentType = "application/json";
+
+    public Response() {
+
+        if (!contextGenerators.containsKey("application/json")) {
+            contextGenerators.put("application/json", new JSONGenerator());
+        }
+
+        if (!contextGenerators.containsKey("text/plain")) {
+            contextGenerators.put("text/plain", new TextGenerator());
+        }
+    }
+
+    public static void registerModelGenerator(String contentType, ModelGenerator mg) {
+        contextGenerators.put(contentType, mg);
+    }
 
     public Response OK() {
         status = 200;
@@ -93,8 +113,20 @@ public class Response {
         return this;
     }
 
+    public Response ContentType(String content) {
+        contentType = content;
+        return this;
+    }
+
     public Response model(Object object) {
-        content = gson.toJson(object).getBytes();
+        ModelGenerator generator = null;
+        if (contextGenerators.containsKey(contentType)) {
+            generator = contextGenerators.get(contentType);
+        } else {
+            generator = new TextGenerator();
+            contentType = "text/plain";
+        }
+        content = generator.fromModel(object).getBytes();
         return this;
     }
 
@@ -116,13 +148,13 @@ public class Response {
             response += key + ": " + header.get(key) + "\n";
         }
         if (!header.containsKey("Content-Type") && content.length > 0) {
-            response += "Content-Type: application/json\n";
+            response += "Content-Type: " + contentType + "\n";
         }
 
         if (!header.containsKey("Connection")) {
             response += "Connection: Closed\n";
         }
-        
+
         response += "Content-Length: " + content.length + "\n";
         response += "\n";
 

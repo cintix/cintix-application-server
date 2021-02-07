@@ -16,15 +16,15 @@ import java.util.GregorianCalendar;
  * @author cix
  */
 public class HelloWorldRestEndPoint {
-
+    
     @Inject
     RestHttpRequest request;
-
+    
     @Action(path = "/{name}")
     public Response sayHelloBack(String name) {
         return new Response().OK().model(new ResponseModel("Hello " + name));
     }
-
+    
     @Action(path = "/{name}/age/{age}")
     public Response sayHelloBackWithAge(String name, int age) {
         Calendar calendar = GregorianCalendar.getInstance();
@@ -32,10 +32,10 @@ public class HelloWorldRestEndPoint {
         calendar.add(Calendar.YEAR, -age);
         return new Response().OK().model(new ResponseModel("Hello " + name + " your " + age + " old and born in " + calendar.get(Calendar.YEAR)));
     }
-
+    
     @Action(path = "/world")
     public Response sayHelloToTheWorld() {
-        return new Response().OK().model(new ResponseModel("Hello everyone!"));
+        return new Response().OK().ContentType("text/plain").model(new ResponseModel("Hello everyone!"));
     }
-
+    
 }

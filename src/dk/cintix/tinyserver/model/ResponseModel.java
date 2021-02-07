@@ -14,5 +14,9 @@ public class ResponseModel {
         this.message = message;
     }
 
+    @Override
+    public String toString() {
+        return "ResponseModel{" + "message=" + message + '}';
+    }
 
 }

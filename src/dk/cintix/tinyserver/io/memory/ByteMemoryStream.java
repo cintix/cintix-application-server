@@ -1,6 +1,6 @@
 /*
  */
-package dk.cintix.tinyserver.io;
+package dk.cintix.tinyserver.io.memory;
 
 /**
  *
