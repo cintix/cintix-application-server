@@ -420,3 +420,537 @@ DNT: 1
 Connection: keep-alive
 Upgrade-Insecure-Requests: 1
 Sec-GPC: 1
+[LOG][2021-02-07 18:46:38.972] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 18:46:38.972] Listering...
+[LOG][2021-02-07 18:46:40.783] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:85.0) Gecko/20100101 Firefox/85.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: da,en-US;q=0.7,en;q=0.3
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-02-07 18:46:47.590] GET /api/hello/Christian HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:85.0) Gecko/20100101 Firefox/85.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: da,en-US;q=0.7,en;q=0.3
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-02-07 18:48:36.457] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 0720805d-91ad-4b0a-99f2-188e8742a0c6
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 76
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email":"michael@cintix.dk"}
+[LOG][2021-02-07 18:49:35.499] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: af478617-1a36-443b-b0ac-e415a4510a6c
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 18:51:29.959] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 18:51:29.959] Listering...
+[LOG][2021-02-07 18:51:36.054] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 1865993c-09c3-4e60-bebb-f467ea53dfab
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 18:52:33.958] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 0f07be66-c68e-41b7-88c5-a9ac655ac8d7
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 18:56:12.486] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 18:56:12.486] Listering...
+[LOG][2021-02-07 18:56:14.209] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 7919c6e5-957e-4d1a-a3a3-6d789333020e
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 18:56:40.351] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 18:56:40.352] Listering...
+[LOG][2021-02-07 18:56:43.748] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: beb8e3bc-25d3-4cb1-9446-a7b3a9352f38
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 18:58:24.963] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 18:58:24.963] Listering...
+[LOG][2021-02-07 18:58:26.178] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: ab708f67-4792-404f-a1aa-8ce9df249103
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 18:59:58.165] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 18:59:58.165] Listering...
+[LOG][2021-02-07 18:59:59.548] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 688e39eb-6a3f-4098-b894-ff444c64762a
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:00:21.581] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:00:21.582] Listering...
+[LOG][2021-02-07 19:00:23.518] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: bb448d5c-c477-436b-b6b3-096b3ee93ddf
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:01:30.333] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:01:30.334] Listering...
+[LOG][2021-02-07 19:01:35.131] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: c5c51922-d183-4690-98b8-2dafbcc914d2
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:02:17.051] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:02:17.052] Listering...
+[LOG][2021-02-07 19:02:19.189] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: cc5bd435-8160-4b30-9881-caf268c22aba
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:04:54.221] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:04:54.221] Listering...
+[LOG][2021-02-07 19:04:58.209] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: f9170d9c-0f06-43dc-8237-605911063ac6
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:11:38.208] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:11:38.208] Listering...
+[LOG][2021-02-07 19:11:40.771] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 69ab8cf2-fdcb-422b-a45c-7c3fa62936f5
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:12:51.857] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:12:51.858] Listering...
+[LOG][2021-02-07 19:12:55.004] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: c06a270c-ddab-48b3-a561-d8717bfc6b3a
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:22:55.767] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:22:55.767] Listering...
+[LOG][2021-02-07 19:22:58.122] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 0a2eddb2-5ffd-47a7-82d9-7fa15c645a49
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:23:33.196] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:23:33.196] Listering...
+[LOG][2021-02-07 19:23:37.824] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 9783a301-e91e-4ed2-8e3c-550d0dffecf2
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:24:17.681] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:24:17.681] Listering...
+[LOG][2021-02-07 19:24:21.412] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 8a28f6af-93da-42bb-8e1d-c543db8e260f
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:25:16.899] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:25:16.899] Listering...
+[LOG][2021-02-07 19:25:20.760] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 700fb40c-770c-44ec-a345-437224db6165
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:25:33.394] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:25:33.394] Listering...
+[LOG][2021-02-07 19:25:35.713] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 08917f86-495b-4cc8-a4f3-3017b891c367
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:25:54.553] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:25:54.553] Listering...
+[LOG][2021-02-07 19:25:56.193] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: fe5e59c3-2bc8-48d4-8b9f-afdd152e726f
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:26:15.222] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:26:15.222] Listering...
+[LOG][2021-02-07 19:26:17.160] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: d7567568-50ff-4b76-870b-ffc5a4cc2b10
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:26:48.357] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:26:48.357] Listering...
+[LOG][2021-02-07 19:26:49.535] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: dccd27a0-547e-4353-939f-7a5d839d1045
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:27:00.244] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:27:00.244] Listering...
+[LOG][2021-02-07 19:27:01.760] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 7c060fc7-3eaf-46e0-a41d-b5c6f2bed52b
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:27:28.583] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:27:28.583] Listering...
+[LOG][2021-02-07 19:27:33.707] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 02016ed2-7901-427a-85fe-2243b716ccb1
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:28:03.463] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:28:03.464] Listering...
+[LOG][2021-02-07 19:28:12.952] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: b5ec8809-a43e-444c-8401-877b25b06a61
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:28:38.666] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:28:38.666] Listering...
+[LOG][2021-02-07 19:28:42.412] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: b935e57e-59c2-4b33-af6b-7a0143602825
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:29:20.540] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:29:20.540] Listering...
+[LOG][2021-02-07 19:29:23.003] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 7665a510-342c-4062-ad16-d17edd984b3e
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:29:49.688] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:29:49.688] Listering...
+[LOG][2021-02-07 19:29:53.007] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 2b35951f-3977-4074-8990-25a716b05438
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:31:34.477] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:31:34.477] Listering...
+[LOG][2021-02-07 19:31:36.458] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 006f150b-0e8e-47c4-9eba-98265e3ba2b7
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:32:08.390] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:32:08.390] Listering...
+[LOG][2021-02-07 19:32:09.551] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 3c1e4b8a-7464-4aeb-acf5-147bdc8a1e40
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:32:23.058] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 21e0d924-7b6b-4048-be8e-d93c744de0d1
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:32:27.068] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:32:27.068] Listering...
+[LOG][2021-02-07 19:32:27.506] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: c9674f6a-0ea1-4bb9-9107-bc0d6bd42275
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:33:10.425] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:33:10.425] Listering...
+[LOG][2021-02-07 19:33:15.371] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 73ebe072-3cb1-48de-b065-353dd22ccb85
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:33:57.445] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:33:57.445] Listering...
+[LOG][2021-02-07 19:33:58.889] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 824ee2d6-a423-4f55-80a6-89c2b817ff6b
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:34:31.545] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:34:31.546] Listering...
+[LOG][2021-02-07 19:34:33.343] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 9a5f0105-c782-4235-9048-033c8976d400
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:34:59.738] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:34:59.738] Listering...
+[LOG][2021-02-07 19:35:01.107] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 7b5774c8-7a57-4922-8b43-aaf924165ff3
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:35:43.177] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:35:43.177] Listering...
+[LOG][2021-02-07 19:35:48.529] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 7fd891b3-4372-43a2-8f74-ada85d0260ec
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:36:36.564] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:36:36.565] Listering...
+[LOG][2021-02-07 19:36:39.056] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 482ca8df-339e-4d8c-ad85-4d22870a616f
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:38:40.745] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:38:40.745] Listering...
+[LOG][2021-02-07 19:38:41.444] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 100b6198-7af3-4a24-be7a-847a74807e15
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-02-07 19:39:38.551] Server start on /0.0.0.0:8080
+[LOG][2021-02-07 19:39:38.551] Listering...
+[LOG][2021-02-07 19:39:44.907] POST /api/hello HTTP/1.1
+Content-Type: application/json
+User-Agent: PostmanRuntime/7.26.10
+Accept: */*
+Postman-Token: 71523312-5042-4e7b-bf0c-f8729bbd768c
+Host: 127.0.0.1:8080
+Accept-Encoding: gzip, deflate, br
+Connection: keep-alive
+Content-Length: 77
+
+{"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}

@@ -14,6 +14,7 @@ public class HttpUtil {
 
     public static void parsePostFields(int linesProcessed, String[] requestLines, final Map<String, String> postFields) {
         if (linesProcessed < (requestLines.length)) {
+            postFields.put("!RAW",  requestLines[linesProcessed]);
             String[] postParams = requestLines[linesProcessed++].split("&");
             for (int index = 0; index < postParams.length; index++) {
                 if (postParams[index].contains("=")) {
@@ -71,6 +72,14 @@ public class HttpUtil {
             path = path.substring(0, -1);
         }
         return path;
+    }
+
+    public static boolean contentTypeMatch(String accept, String contentType) {
+        String patternString = "^" + accept.replaceAll("\\*", "\\\\S+").replaceAll("/", "\\\\/");
+        Pattern pattern = Pattern.compile(patternString);
+        Matcher matcher = pattern.matcher(contentType);
+        System.out.println(patternString + " : " + contentType);
+        return matcher.find();
     }
 
     public static String complieRegexFromPath(String path) {

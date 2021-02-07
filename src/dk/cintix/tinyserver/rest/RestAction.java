@@ -2,14 +2,18 @@
  */
 package dk.cintix.tinyserver.rest;
 
+import dk.cintix.tinyserver.model.ModelGenerator;
+import dk.cintix.tinyserver.rest.annotations.Action;
 import dk.cintix.tinyserver.rest.annotations.Inject;
 import dk.cintix.tinyserver.rest.http.request.RestHttpRequest;
+import dk.cintix.tinyserver.rest.http.utils.HttpUtil;
 import dk.cintix.tinyserver.rest.response.Response;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.text.SimpleDateFormat;
 import java.util.List;
+import java.util.Map;
 
 /**
  *
@@ -20,6 +24,7 @@ public class RestAction {
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("YYYY-MM-dd");
     private final List<String> arguments;
     private final RestEndpoint endpoint;
+    private ModelGenerator generator;
 
     public RestAction(RestEndpoint endpoint, List<String> arguments) {
         this.arguments = arguments;
@@ -54,12 +59,31 @@ public class RestAction {
             Parameter[] parameterTypes = method.getParameters();
             Object[] methodArguments = new Object[parameterTypes.length];
 
-            for (int index = 0; index < parameterTypes.length; index++) {
-                Parameter parameter = parameterTypes[index];
-                String value = arguments.get(index);
-                methodArguments[index] = valueFromType(parameter.getType().getTypeName(), value);
-            }
+            String accept = method.getAnnotation(Action.class).consume();
 
+            if (!HttpUtil.contentTypeMatch(accept, request.getContentType())) {
+                return new Response().NotFound();
+            } else {
+                Map<String, ModelGenerator> contextGenerators = new Response().getContextGenerators();
+
+                if (contextGenerators.containsKey(accept)) {
+                    generator = contextGenerators.get(accept);
+                } else {
+                    generator = contextGenerators.get("default");
+                }
+            }
+            if (parameterTypes.length == 1 && arguments.size() == 0 && (request.getMethod().toUpperCase().equals("POST") || request.getMethod().toUpperCase().equals("PUT"))) {
+                Parameter parameter = parameterTypes[0];
+                System.out.println("request.getRawPost() - " + request.getRawPost());
+                methodArguments[0] = valueFromType(parameter, request.getRawPost());
+            } else {
+                for (int index = 0; index < parameterTypes.length; index++) {
+                    Parameter parameter = parameterTypes[index];
+                    String value = arguments.get(index);
+                    methodArguments[index] = valueFromType(parameter, value);
+                }
+            }
+            
             return (Response) method.invoke(endpoint.getObject(), methodArguments);
         } catch (Exception exception) {
             exception.printStackTrace();
@@ -67,9 +91,9 @@ public class RestAction {
         }
     }
 
-    private Object valueFromType(String type, String value) throws Exception {
+    private Object valueFromType(Parameter parameter, String value) throws Exception {
         Object obj = value;
-        switch (type) {
+        switch (parameter.getType().getTypeName()) {
             case "java.lang.String":
                 return value;
             case "java.util.Date":
@@ -97,8 +121,10 @@ public class RestAction {
             case "double":
             case "java.lang.Double":
                 return Double.parseDouble(value);
+            default:
+                System.out.println("generator: " + value);
+                return generator.toModel(value, parameter.getType());
         }
-        return obj;
     }
 
     @Override

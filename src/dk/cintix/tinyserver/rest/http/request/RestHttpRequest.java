@@ -17,14 +17,16 @@ public class RestHttpRequest {
     private final InputStream inputStream;
     private final String contextPath;
     private final String method;
+    private final String rawPost;
 
-    public RestHttpRequest(Map<String, String> headers, Map<String, String> queryStrings, Map<String, String> postParams, InputStream inputStream, String method, String contextPath) {
+    public RestHttpRequest(Map<String, String> headers, Map<String, String> queryStrings, Map<String, String> postParams, InputStream inputStream, String method, String contextPath, String rawPost) {
         this.headers = headers;
         this.queryStrings = queryStrings;
         this.postParams = postParams;
         this.inputStream = inputStream;
         this.contextPath = contextPath;
         this.method = method;
+        this.rawPost = rawPost;
     }
 
     public String getHeader(String key) {
@@ -72,8 +74,22 @@ public class RestHttpRequest {
         return method;
     }
 
+    public String getContentType() {
+        for (String key : headers.keySet()) {
+            if (key.toLowerCase().equals("content-type")) {
+                return headers.get(key);
+            }
+        }
+        return "*/*";
+    }
+
+    public String getRawPost() {
+        return rawPost;
+    }
+
     @Override
     public String toString() {
-        return "RestHttpRequest{" + "headers=" + headers + ", queryStrings=" + queryStrings + ", postParams=" + postParams + ", inputStream=" + inputStream + ", contextPath=" + contextPath + ", method=" + method + '}';
+        return "RestHttpRequest{" + "headers=" + headers + ", queryStrings=" + queryStrings + ", postParams=" + postParams + ", inputStream=" + inputStream + ", contextPath=" + contextPath + ", method=" + method + ", rawPost=" + rawPost + '}';
     }
+
 }

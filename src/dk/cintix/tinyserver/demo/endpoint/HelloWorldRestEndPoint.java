@@ -42,7 +42,7 @@ public class HelloWorldRestEndPoint {
     }
 
     @POST
-    @Action
+    @Action(consume = "application/json")
     public Response register(Person person) {
         System.out.println("person " + person);
         return new Response().OK();

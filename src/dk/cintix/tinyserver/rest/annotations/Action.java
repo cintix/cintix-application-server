@@ -15,4 +15,5 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 public @interface Action {
     String path() default "/";
+    String consume() default "*/*";
 } 

@@ -27,7 +27,6 @@ public class Response {
     private Map<String, String> header = new LinkedHashMap<>();
     private byte[] content = new byte[0];
     private String contentType = "application/json";
-
     public Response() {
 
         if (!contextGenerators.containsKey("application/json")) {
@@ -36,7 +35,23 @@ public class Response {
 
         if (!contextGenerators.containsKey("text/plain")) {
             contextGenerators.put("text/plain", new TextGenerator());
+            contextGenerators.put("default", new TextGenerator());
         }
+    }
+
+    public static Map<String, ModelGenerator> getContextGenerators() {
+        return contextGenerators;
+    }
+
+    public ModelGenerator getGenerator() {
+        ModelGenerator generator = null;
+        if (contextGenerators.containsKey(contentType)) {
+            generator = contextGenerators.get(contentType);
+        } else {
+            generator = new TextGenerator();
+            contentType = "text/plain";
+        }
+        return generator;
     }
 
     public static void registerModelGenerator(String contentType, ModelGenerator mg) {
@@ -119,13 +134,7 @@ public class Response {
     }
 
     public Response model(Object object) {
-        ModelGenerator generator = null;
-        if (contextGenerators.containsKey(contentType)) {
-            generator = contextGenerators.get(contentType);
-        } else {
-            generator = new TextGenerator();
-            contentType = "text/plain";
-        }
+        ModelGenerator generator = getGenerator();      
         content = generator.fromModel(object).getBytes();
         return this;
     }
@@ -148,7 +157,7 @@ public class Response {
             response += key + ": " + header.get(key) + "\n";
         }
         if (!header.containsKey("Content-Type") && content.length > 0) {
-            response += "Content-Type: " + contentType + "\n";
+            response += "Content-Type: " + contentType + "; charset=utf-8\n";
         }
 
         if (!header.containsKey("Connection")) {

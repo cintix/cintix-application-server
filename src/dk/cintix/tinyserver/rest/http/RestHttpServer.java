@@ -220,7 +220,6 @@ public abstract class RestHttpServer {
         }
 
         String data = new String(buffer.array()).trim();
-
         if (data.length() > 0) {
             notifyEvent(data);
             RestHttpRequest request = parseRequest(restClient, client, data);
@@ -261,13 +260,14 @@ public abstract class RestHttpServer {
         if (contextPath.endsWith("/")) {
             contextPath = contextPath.substring(0, contextPath.length() - 1);
         }
-
+        
         linesProcessed = HttpUtil.parseHeaderKeys(requestLines, headers, linesProcessed);
         HttpUtil.parsePostFields(linesProcessed, requestLines, postFields);
 
-        RestHttpRequest httpRequest = new RestHttpRequest(headers, queryStrings, postFields, inputStream, method, contextPath);
-        requestEvent(restClient, httpRequest);
+        RestHttpRequest httpRequest = new RestHttpRequest(headers, queryStrings, postFields, inputStream, method, contextPath, postFields.get("!RAW"));
+        postFields.remove("!RAW");
 
+        requestEvent(restClient, httpRequest);
         return httpRequest;
     }
 
@@ -343,6 +343,10 @@ public abstract class RestHttpServer {
 
                 if (!actionPath.startsWith("/")) {
                     actionPath = "/" + action.path();
+                }
+
+                if (action.path().equals("/")) {
+                    actionPath = "";
                 }
 
                 String urlPattern = HttpUtil.complieRegexFromPath(base + actionPath);
