@@ -3,7 +3,6 @@
 package dk.cintix.tinyserver.rest;
 
 import java.nio.channels.SocketChannel;
-import java.util.Date;
 
 /**
  *
@@ -15,7 +14,7 @@ public class RestClient {
     private String remoteAddress;
     private String sessionId;
     private long created;
-
+    
     public RestClient(SocketChannel sc) throws Exception {
         localAddress = sc.getLocalAddress().toString();
         remoteAddress = sc.getRemoteAddress().toString();

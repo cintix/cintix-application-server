@@ -2,13 +2,19 @@
  */
 package dk.cintix.tinyserver.rest.http;
 
+import dk.cintix.tinyserver.rest.http.utils.HttpUtil;
 import dk.cintix.tinyserver.rest.http.request.RestHttpRequest;
 import dk.cintix.tinyserver.events.HttpRequestEvents;
 import dk.cintix.tinyserver.events.HttpNotificationEvents;
 import dk.cintix.tinyserver.events.HttpConnectionEvents;
+import dk.cintix.tinyserver.rest.RestAction;
 import dk.cintix.tinyserver.rest.RestClient;
-import dk.cintix.tinyserver.rest.RestEndPoint;
+import dk.cintix.tinyserver.rest.RestEndpoint;
+import dk.cintix.tinyserver.rest.annotations.Action;
+import dk.cintix.tinyserver.rest.http.session.InternalClientSession;
+import dk.cintix.tinyserver.rest.response.Response;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.ByteBuffer;
@@ -18,8 +24,12 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  *
@@ -27,7 +37,7 @@ import java.util.Set;
  */
 public abstract class RestHttpServer {
 
-    private static final Map<String, RestEndPoint> pathMapping = new LinkedHashMap<>();
+    private static final Map<String, RestEndpoint> pathMapping = new LinkedHashMap<>();
     private final Map<String, RestClient> clientSessions = new LinkedHashMap<>();
 
     private HttpConnectionEvents connectionEvents;
@@ -59,8 +69,8 @@ public abstract class RestHttpServer {
         serverSocket.bind(address, backlog);
     }
 
-    public void addEndpoint(String path, RestEndPoint endpoint) {
-        pathMapping.put(path, endpoint);
+    public void addEndpoint(String path, Object endpoint) {
+        registerEndpoint(pathMapping, path, endpoint);
     }
 
     public void connectedEvent(RestClient client) {
@@ -128,6 +138,9 @@ public abstract class RestHttpServer {
                         handleRead(key);
                     }
 
+                    if (key.isWritable()) {
+                        handleWrite(key);
+                    }
                 }
             } catch (Exception exception) {
             } finally {
@@ -137,14 +150,12 @@ public abstract class RestHttpServer {
         return running;
     }
 
-    private void handleDisconnect(ServerSocketChannel mySocket, SelectionKey key) throws Exception {
-        String sessionId = (key.attachment() != null) ? key.attachment().toString() : null;
-        if (sessionId != null && clientSessions.containsKey(sessionId)) {
-            RestClient restClient = clientSessions.get(sessionId);
-            clientSessions.remove(sessionId);
-            disconnectedEvent(restClient);
-        }
+    private void handleDisconnect(SelectionKey key) throws Exception {
+        InternalClientSession clientSession = readAttachment(key);
         key.cancel();
+
+        RestClient restClient = clientSessions.get(clientSession.getSessionId());
+        disconnectedEvent(restClient);
     }
 
     private void handleAccept(ServerSocketChannel mySocket, SelectionKey key) throws Exception {
@@ -153,34 +164,56 @@ public abstract class RestHttpServer {
         key.attach(restClient.getSessionId());
 
         clientSessions.put(restClient.getSessionId(), restClient);
+        InternalClientSession clientSession = new InternalClientSession(restClient.getSessionId());
 
         client.configureBlocking(false);
-        client.register(selector, SelectionKey.OP_READ, restClient.getSessionId());
+        client.register(selector, SelectionKey.OP_READ, clientSession);
         connectedEvent(restClient);
     }
 
-    private void handleRead(SelectionKey key) throws Exception {
-        String sessionId = (key.attachment() != null) ? key.attachment().toString() : null;
+    private void handleWrite(SelectionKey key) throws Exception {
+        InternalClientSession clientSession = readAttachment(key);
         SocketChannel client = (SocketChannel) key.channel();
-        RestClient restClient = clientSessions.get(sessionId);
+        Response response = clientSession.getResponse();
+        byte[] buildedResponse = response.build();
+        
+        System.out.println(new String(buildedResponse));
+        
+        ByteBuffer buffer = ByteBuffer.wrap(buildedResponse);
+        client.write(buffer);
+        InternalClientSession newSession = new InternalClientSession(clientSession.getSessionId());
+        client.register(selector, SelectionKey.OP_READ, newSession);
+    }
+
+    private void handleRead(SelectionKey key) throws Exception {
+        InternalClientSession clientSession = readAttachment(key);
+        SocketChannel client = (SocketChannel) key.channel();
+        RestClient restClient = clientSessions.get(clientSession.getSessionId());
 
         ByteBuffer buffer = ByteBuffer.allocate(1024);
 
         int read = client.read(buffer);
         if (read == -1) {
-            handleDisconnect(serverSocketChannel, key);
+            handleDisconnect(key);
         }
+
         String data = new String(buffer.array()).trim();
 
         if (data.length() > 0) {
             notifyEvent(data);
             RestHttpRequest request = parseRequest(restClient, client, data);
-            System.out.println("request : " + request);
-            for (String hKey : request.getHeaders().keySet()) {
-                System.out.println("Key: " + hKey + " = " + request.getHeader(hKey));
-            }
+            Response response = handleRequestMapping(pathMapping, request);
+            InternalClientSession session = new InternalClientSession(clientSession.getSessionId(), response);
+            client.register(selector, SelectionKey.OP_WRITE, session);
         }
 
+    }
+
+    private InternalClientSession readAttachment(SelectionKey key) throws Exception {
+        if (key.attachment() != null) {
+            return (InternalClientSession) key.attachment();
+        }
+        throw new Exception("Unregistered client read (no session)");
     }
 
     private RestHttpRequest parseRequest(RestClient restClient, SocketChannel client, String headerData) throws Exception {
@@ -201,10 +234,10 @@ public abstract class RestHttpServer {
         }
 
         contextPath.trim();
-        parseQueryStrings(contextPath, queryStrings);
+        contextPath = HttpUtil.parseQueryStrings(contextPath, queryStrings);
 
-        linesProcessed = parseHeaderKeys(requestLines, headers, linesProcessed);
-        parsePostFields(linesProcessed, requestLines, postFields);
+        linesProcessed = HttpUtil.parseHeaderKeys(requestLines, headers, linesProcessed);
+        HttpUtil.parsePostFields(linesProcessed, requestLines, postFields);
 
         RestHttpRequest httpRequest = new RestHttpRequest(headers, queryStrings, postFields, inputStream, method, contextPath);
         requestEvent(restClient, httpRequest);
@@ -212,42 +245,45 @@ public abstract class RestHttpServer {
         return httpRequest;
     }
 
-    private void parsePostFields(int linesProcessed, String[] requestLines, final Map<String, String> postFields) {
-        if (linesProcessed < (requestLines.length - 1)) {
-            String[] postParams = requestLines[linesProcessed++].split("&");
-            for (int index = 0; index < postParams.length; index++) {
-                if (postParams[index].contains("=")) {
-                    String[] keyValue = postParams[index].split("=");
-                    postFields.put(keyValue[0], (keyValue[1] != null) ? keyValue[1].trim() : "");
-                }
-            }
+    private Response handleRequestMapping(Map<String, RestEndpoint> pathMapping, RestHttpRequest request) throws Exception {
+        String contextPath = request.getContextPath();
+        RestAction restAction = locateEndpint(pathMapping, contextPath);
+        if (restAction != null) {
+            return new Response().OK();
+        } else {
+            return new Response().NotFound();
         }
     }
 
-    private void parseQueryStrings(String contextPath, final Map<String, String> queryStrings) {
-        if (contextPath.contains("?")) {
-            int offset = contextPath.indexOf("?");
-            String queryStringLine = contextPath.substring(offset);
-            String[] queryStrins = queryStringLine.split("&");
-            for (int index = 0; index < queryStrins.length; index++) {
-                if (queryStrins[index].contains("=")) {
-                    String[] keyValue = queryStrins[index].split("=");
-                    queryStrings.put(keyValue[0], (keyValue[1] != null) ? keyValue[1].trim() : "");
-                }
+    private RestAction locateEndpint(Map<String, RestEndpoint> mapping, String contextPath) throws Exception {
+        for (String pattern : mapping.keySet()) {
+            Pattern regex = Pattern.compile(pattern);
+            Matcher matcher = regex.matcher(contextPath);
+            boolean found = false;
+            List<String> arguments = new LinkedList<>();
+            while (matcher.find()) {
+                found = true;
+                String argument = matcher.group(1);
+                arguments.add(argument);
+            }
+            if (found) {
+                return new RestAction(mapping.get(pattern), arguments);
             }
         }
+        return null;
     }
 
-    private int parseHeaderKeys(String[] requestLines, final Map<String, String> headers, int linesProcessed) {
-        for (int index = 1; index < requestLines.length; index++) {
-            if (requestLines[index] == null || requestLines[index] == "") {
-                break;
+    private void registerEndpoint(Map<String, RestEndpoint> pathMapping, String path, Object endpoint) {
+        String base = path;
+        Method[] methods = endpoint.getClass().getDeclaredMethods();
+        for (Method method : methods) {
+            if (method.isAnnotationPresent(Action.class)) {
+                Action action = method.getAnnotation(Action.class);
+                String urlPattern = HttpUtil.complieRegexFromPath(base + action.path());
+                pathMapping.put(urlPattern, new RestEndpoint(base + action.path(), method, endpoint));
             }
-            String[] keyValue = requestLines[index].split(":");
-            headers.put(keyValue[0], (keyValue[1] != null) ? keyValue[1].trim() : "");
-            linesProcessed++;
         }
-        return linesProcessed;
+
     }
 
 }
