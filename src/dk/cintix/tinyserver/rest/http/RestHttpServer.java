@@ -190,8 +190,6 @@ public abstract class RestHttpServer {
     }
 
     private void handleRead(SelectionKey key) throws Exception {
-        System.out.println("clientSessions " + clientSessions.size());
-
         InternalClientSession clientSession = readAttachment(key);
         SocketChannel client = (SocketChannel) key.channel();
         RestClient restClient = clientSessions.get(clientSession.getSessionId());
@@ -239,8 +237,12 @@ public abstract class RestHttpServer {
             contextPath += methodAndPath[index] + " ";
         }
 
-        contextPath.trim();
+        contextPath = contextPath.trim();
         contextPath = HttpUtil.parseQueryStrings(contextPath, queryStrings);
+        contextPath = contextPath.trim();
+        if (contextPath.endsWith("/")) {
+            contextPath = contextPath.substring(0, contextPath.length()-1);
+        }
 
         linesProcessed = HttpUtil.parseHeaderKeys(requestLines, headers, linesProcessed);
         HttpUtil.parsePostFields(linesProcessed, requestLines, postFields);
@@ -263,6 +265,10 @@ public abstract class RestHttpServer {
 
     private RestAction locateEndpint(Map<String, RestEndpoint> mapping, String contextPath) throws Exception {
 
+        if (mapping.containsKey(contextPath)) {
+            return new RestAction(mapping.get(contextPath), new LinkedList<String>());
+        }
+
         List<String> regexMApping = new LinkedList<>();
         regexMApping.addAll(mapping.keySet());
 
@@ -270,6 +276,11 @@ public abstract class RestHttpServer {
         Collections.reverse(regexMApping);
 
         for (String pattern : regexMApping) {
+
+            if (!pattern.startsWith("^")) {
+                continue;
+            }
+
             Pattern regex = Pattern.compile(pattern);
             Matcher matcher = regex.matcher(contextPath);
             boolean found = false;
@@ -296,6 +307,7 @@ public abstract class RestHttpServer {
                 Action action = method.getAnnotation(Action.class);
                 String urlPattern = HttpUtil.complieRegexFromPath(base + action.path());
                 pathMapping.put(urlPattern, new RestEndpoint(base + action.path(), method, endpoint));
+                pathMapping.put(base + action.path(), new RestEndpoint(base + action.path(), method, endpoint));
             }
         }
 
