@@ -3,6 +3,7 @@
 package dk.cintix.tinyserver.rest.response;
 
 import com.google.gson.Gson;
+import dk.cintix.tinyserver.io.ByteMemoryStream;
 import java.io.ByteArrayOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -103,7 +104,7 @@ public class Response {
     }
 
     public byte[] build() {
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        ByteMemoryStream outputStream = new ByteMemoryStream();
         String response = "HTTP/1.1 " + status + " " + messageFromStatus(status) + "\n";
         response += "Date: " + dateFormat.format(new Date()) + "\n";
 
