@@ -92,7 +92,7 @@ public class Response {
         return this;
     }
 
-    public Response mode(Object object) {
+    public Response model(Object object) {
         content = gson.toJson(object).getBytes();
         return this;
     }

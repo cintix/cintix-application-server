@@ -22,6 +22,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -176,13 +178,14 @@ public abstract class RestHttpServer {
         SocketChannel client = (SocketChannel) key.channel();
         Response response = clientSession.getResponse();
         byte[] buildedResponse = response.build();
-        
+
         System.out.println(new String(buildedResponse));
-        
+
         ByteBuffer buffer = ByteBuffer.wrap(buildedResponse);
         client.write(buffer);
         InternalClientSession newSession = new InternalClientSession(clientSession.getSessionId());
-        client.register(selector, SelectionKey.OP_READ, newSession);
+        client.close();
+        key.cancel();
     }
 
     private void handleRead(SelectionKey key) throws Exception {
@@ -247,24 +250,33 @@ public abstract class RestHttpServer {
 
     private Response handleRequestMapping(Map<String, RestEndpoint> pathMapping, RestHttpRequest request) throws Exception {
         String contextPath = request.getContextPath();
-        RestAction restAction = locateEndpint(pathMapping, contextPath);
+        RestAction restAction = locateEndpint(pathMapping, contextPath.trim());
         if (restAction != null) {
-            return new Response().OK();
+            return restAction.process();
         } else {
             return new Response().NotFound();
         }
     }
 
     private RestAction locateEndpint(Map<String, RestEndpoint> mapping, String contextPath) throws Exception {
-        for (String pattern : mapping.keySet()) {
+
+        List<String> regexMApping = new LinkedList<>();
+        regexMApping.addAll(mapping.keySet());
+
+        Collections.sort(regexMApping, Comparator.comparing(String::length));
+        Collections.reverse(regexMApping);
+
+        for (String pattern : regexMApping) {
             Pattern regex = Pattern.compile(pattern);
             Matcher matcher = regex.matcher(contextPath);
             boolean found = false;
             List<String> arguments = new LinkedList<>();
+
             while (matcher.find()) {
                 found = true;
-                String argument = matcher.group(1);
-                arguments.add(argument);
+                for (int index = 2; index < matcher.groupCount() + 1; index++) {
+                    arguments.add(matcher.group(index));
+                }
             }
             if (found) {
                 return new RestAction(mapping.get(pattern), arguments);
