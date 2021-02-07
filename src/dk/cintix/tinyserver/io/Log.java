@@ -27,7 +27,7 @@ public class Log {
         }
     }
 
-    public static Log instane() {
+    public static Log instance() {
         if (instance == null) {
             instance = new Log();
         }

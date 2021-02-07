@@ -15,7 +15,7 @@ import java.net.InetSocketAddress;
  */
 public class Server extends RestHttpServer implements HttpNotificationEvents, HttpConnectionEvents {
     
-    private final Log LOG = Log.instane();
+    private final Log LOG = Log.instance();
     
     public Server() {
         try {
@@ -25,6 +25,7 @@ public class Server extends RestHttpServer implements HttpNotificationEvents, Ht
             
             bind(new InetSocketAddress("0.0.0.0", 8080));
             addEndpoint("/api/hello", new HelloWorldRestEndPoint());
+            
             startServer();
             
         } catch (Exception exception) {

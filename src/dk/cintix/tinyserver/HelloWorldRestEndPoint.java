@@ -18,12 +18,12 @@ public class HelloWorldRestEndPoint {
 
     @Action(path = "/{name}")
     public Response sayHelloBack(String name) {
-        return new Response().OK();
+        return new Response().OK().data("Hello " + name);
     }
 
     @Action(path = "/world")
     public Response sayHelloToTheWorld() {
-        return new Response().OK();
+        return new Response().OK().data("Hello everyone!");
     }
 
 }
