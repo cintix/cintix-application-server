@@ -198,8 +198,6 @@ public abstract class RestHttpServer {
         Response response = clientSession.getResponse();
         byte[] buildedResponse = response.build();
 
-        System.out.println(new String(buildedResponse));
-
         ByteBuffer buffer = ByteBuffer.wrap(buildedResponse);
         client.write(buffer);
         InternalClientSession newSession = new InternalClientSession(clientSession.getSessionId());

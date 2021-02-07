@@ -171,7 +171,6 @@ public class Response {
         if (content.length > 0) {
             outputStream.writeBytes(content);
         }
-        System.out.println("");
         return outputStream.toByteArray();
     }
 

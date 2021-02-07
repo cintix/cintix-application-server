@@ -74,7 +74,6 @@ public class RestAction {
             }
             if (parameterTypes.length == 1 && arguments.size() == 0 && (request.getMethod().toUpperCase().equals("POST") || request.getMethod().toUpperCase().equals("PUT"))) {
                 Parameter parameter = parameterTypes[0];
-                System.out.println("request.getRawPost() - " + request.getRawPost());
                 methodArguments[0] = valueFromType(parameter, request.getRawPost());
             } else {
                 for (int index = 0; index < parameterTypes.length; index++) {
@@ -122,7 +121,6 @@ public class RestAction {
             case "java.lang.Double":
                 return Double.parseDouble(value);
             default:
-                System.out.println("generator: " + value);
                 return generator.toModel(value, parameter.getType());
         }
     }

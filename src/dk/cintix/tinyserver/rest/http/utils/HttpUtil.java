@@ -78,19 +78,16 @@ public class HttpUtil {
         String patternString = "^" + accept.replaceAll("\\*", "\\\\S+").replaceAll("/", "\\\\/");
         Pattern pattern = Pattern.compile(patternString);
         Matcher matcher = pattern.matcher(contentType);
-        System.out.println(patternString + " : " + contentType);
         return matcher.find();
     }
 
     public static String complieRegexFromPath(String path) {
         String patternString = "(\\{\\w+\\})";
         String realPattern = path.replaceAll("/", "\\\\/");
-        //System.out.println("realPattern: " + realPattern);
         Pattern pattern = Pattern.compile(patternString);
         Matcher matcher = pattern.matcher(path);
         while (matcher.find()) {
             realPattern = realPattern.replaceAll(Pattern.quote(matcher.group(0)), "(\\\\S+)");
-            //System.out.println("realPattern: " + realPattern );
         }
         return "^(" + realPattern + ")$";
     }
