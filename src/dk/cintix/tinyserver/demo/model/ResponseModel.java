@@ -1,6 +1,6 @@
 /*
  */
-package dk.cintix.tinyserver.model;
+package dk.cintix.tinyserver.demo.model;
 
 /**
  *

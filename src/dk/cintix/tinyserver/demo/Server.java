@@ -1,7 +1,8 @@
 /*
  */
-package dk.cintix.tinyserver;
+package dk.cintix.tinyserver.demo;
 
+import dk.cintix.tinyserver.demo.endpoint.HelloWorldRestEndPoint;
 import dk.cintix.tinyserver.rest.http.RestHttpServer;
 import dk.cintix.tinyserver.rest.RestClient;
 import dk.cintix.tinyserver.events.HttpNotificationEvents;

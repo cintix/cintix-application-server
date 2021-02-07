@@ -11,6 +11,9 @@ import dk.cintix.tinyserver.rest.RestAction;
 import dk.cintix.tinyserver.rest.RestClient;
 import dk.cintix.tinyserver.rest.RestEndpoint;
 import dk.cintix.tinyserver.rest.annotations.Action;
+import dk.cintix.tinyserver.rest.annotations.POST;
+import dk.cintix.tinyserver.rest.annotations.PUT;
+import dk.cintix.tinyserver.rest.annotations.DELETE;
 import dk.cintix.tinyserver.rest.http.session.InternalClientSession;
 import dk.cintix.tinyserver.rest.response.Response;
 import java.io.InputStream;
@@ -39,7 +42,7 @@ import java.util.regex.Pattern;
  */
 public abstract class RestHttpServer {
 
-    private static final Map<String, RestEndpoint> pathMapping = new LinkedHashMap<>();
+    private static final Map<String, Map<String, RestEndpoint>> pathMapping = new LinkedHashMap<>();
     private final Map<String, RestClient> clientSessions = new LinkedHashMap<>();
 
     private HttpConnectionEvents connectionEvents;
@@ -50,6 +53,13 @@ public abstract class RestHttpServer {
     private ServerSocketChannel serverSocketChannel;
     private ServerSocket serverSocket;
     private volatile boolean running = true;
+
+    public RestHttpServer() {
+        pathMapping.put("get", new LinkedHashMap<>());
+        pathMapping.put("put", new LinkedHashMap<>());
+        pathMapping.put("post", new LinkedHashMap<>());
+        pathMapping.put("delete", new LinkedHashMap<>());
+    }
 
     public boolean isRunning() {
         return running;
@@ -117,7 +127,7 @@ public abstract class RestHttpServer {
         serverSocketChannel.register(selector, validOps, null);
         notifyEvent("Server start on " + address.toString());
         notifyEvent("Listering...");
-
+                
         while (running) {
             int amount = selector.select(3000);
             Set<SelectionKey> selectedKeys = selector.selectedKeys();
@@ -241,7 +251,7 @@ public abstract class RestHttpServer {
         contextPath = HttpUtil.parseQueryStrings(contextPath, queryStrings);
         contextPath = contextPath.trim();
         if (contextPath.endsWith("/")) {
-            contextPath = contextPath.substring(0, contextPath.length()-1);
+            contextPath = contextPath.substring(0, contextPath.length() - 1);
         }
 
         linesProcessed = HttpUtil.parseHeaderKeys(requestLines, headers, linesProcessed);
@@ -253,9 +263,11 @@ public abstract class RestHttpServer {
         return httpRequest;
     }
 
-    private Response handleRequestMapping(Map<String, RestEndpoint> pathMapping, RestHttpRequest request) throws Exception {
+    private Response handleRequestMapping(Map<String, Map<String, RestEndpoint>> pathMapping, RestHttpRequest request) throws Exception {
         String contextPath = request.getContextPath();
-        RestAction restAction = locateEndpint(pathMapping, contextPath.trim());
+        Map<String, RestEndpoint> requestMap = pathMapping.get(request.getMethod().toUpperCase());
+        RestAction restAction = locateEndpint(requestMap, contextPath.trim());
+
         if (restAction != null) {
             return restAction.process();
         } else {
@@ -264,7 +276,6 @@ public abstract class RestHttpServer {
     }
 
     private RestAction locateEndpint(Map<String, RestEndpoint> mapping, String contextPath) throws Exception {
-
         if (mapping.containsKey(contextPath)) {
             return new RestAction(mapping.get(contextPath), new LinkedList<String>());
         }
@@ -299,15 +310,38 @@ public abstract class RestHttpServer {
         return null;
     }
 
-    private void registerEndpoint(Map<String, RestEndpoint> pathMapping, String path, Object endpoint) {
+    private void registerEndpoint(Map<String, Map<String, RestEndpoint>> pathMapping, String path, Object endpoint) {
         String base = path;
         Method[] methods = endpoint.getClass().getDeclaredMethods();
+
         for (Method method : methods) {
+            String httpMethod = "get";
+
+            if (method.isAnnotationPresent(POST.class)) {
+                httpMethod = "post";
+            }
+            if (method.isAnnotationPresent(PUT.class)) {
+                httpMethod = "put";
+            }
+            if (method.isAnnotationPresent(DELETE.class)) {
+                httpMethod = "delete";
+            }
+
+            Map<String, RestEndpoint> httpMethodMap = pathMapping.get(httpMethod);
+
             if (method.isAnnotationPresent(Action.class)) {
                 Action action = method.getAnnotation(Action.class);
-                String urlPattern = HttpUtil.complieRegexFromPath(base + action.path());
-                pathMapping.put(urlPattern, new RestEndpoint(base + action.path(), method, endpoint));
-                pathMapping.put(base + action.path(), new RestEndpoint(base + action.path(), method, endpoint));
+                String actionPath = action.path();
+
+                if (!actionPath.startsWith("/")) {
+                    actionPath = "/" + action.path();
+                }
+
+                String urlPattern = HttpUtil.complieRegexFromPath(base + actionPath);
+                httpMethodMap.put(urlPattern, new RestEndpoint(base + actionPath, method, endpoint));
+                httpMethodMap.put(base + actionPath, new RestEndpoint(base + actionPath, method, endpoint));
+                pathMapping.put(httpMethod, httpMethodMap);
+                
             }
         }
 
