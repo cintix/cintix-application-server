@@ -2,16 +2,23 @@
  */
 package dk.cintix.tinyserver.rest;
 
+import dk.cintix.tinyserver.io.cache.CacheType;
 import dk.cintix.tinyserver.model.ModelGenerator;
 import dk.cintix.tinyserver.rest.annotations.Action;
+import dk.cintix.tinyserver.rest.annotations.Cache;
 import dk.cintix.tinyserver.rest.annotations.Inject;
+import dk.cintix.tinyserver.rest.annotations.Static;
 import dk.cintix.tinyserver.rest.http.request.RestHttpRequest;
 import dk.cintix.tinyserver.rest.http.utils.HttpUtil;
+import dk.cintix.tinyserver.rest.response.CachedResponse;
 import dk.cintix.tinyserver.rest.response.Response;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +28,7 @@ import java.util.Map;
  */
 public class RestAction {
 
+    private static final Map<String, dk.cintix.tinyserver.io.cache.Cache> _CACHE_MAPS = new LinkedHashMap<>();
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("YYYY-MM-dd");
     private final List<String> arguments;
     private final RestEndpoint endpoint;
@@ -59,12 +67,33 @@ public class RestAction {
             Parameter[] parameterTypes = method.getParameters();
             Object[] methodArguments = new Object[parameterTypes.length];
 
+            String cacheBaseId = baseId(method.toString());
+            String requestId = baseId(Arrays.toString(methodArguments));
+
+            CacheType cacheType = getCacheStategy(method);
+            boolean useCache = (cacheType != CacheType.NONE);
+            dk.cintix.tinyserver.io.cache.Cache cache = _CACHE_MAPS.get(cacheBaseId);
+
+//            System.out.println("useCache " + useCache);
+//            System.out.println("requestId " + requestId);
+//            System.out.println("cacheBaseId " + cacheBaseId);
+//            System.out.println("cache created " + (cache != null));
+
+            if (useCache && cache != null) {
+                if (cache.contains(requestId)) {
+                    CachedResponse response = new CachedResponse(cache.get(requestId).toString().getBytes());
+                    if (response != null) {
+                        return response;
+                    }
+                }
+            }
+
             String accept = method.getAnnotation(Action.class).consume();
 
             if (!HttpUtil.contentTypeMatch(accept, request.getContentType())) {
                 return new Response().NotFound();
             } else {
-                Map<String, ModelGenerator> contextGenerators = new Response().getContextGenerators();
+                Map<String, ModelGenerator> contextGenerators = Response.getContextGenerators();
 
                 if (contextGenerators.containsKey(accept)) {
                     generator = contextGenerators.get(accept);
@@ -72,7 +101,7 @@ public class RestAction {
                     generator = contextGenerators.get("default");
                 }
             }
-            if (parameterTypes.length == 1 && arguments.size() == 0 && (request.getMethod().toUpperCase().equals("POST") || request.getMethod().toUpperCase().equals("PUT"))) {
+            if (parameterTypes.length == 1 && arguments.isEmpty() && (request.getMethod().toUpperCase().equals("POST") || request.getMethod().toUpperCase().equals("PUT"))) {
                 Parameter parameter = parameterTypes[0];
                 methodArguments[0] = valueFromType(parameter, request.getRawPost());
             } else {
@@ -82,12 +111,33 @@ public class RestAction {
                     methodArguments[index] = valueFromType(parameter, value);
                 }
             }
-            
-            return (Response) method.invoke(endpoint.getObject(), methodArguments);
+
+            Response response = (Response) method.invoke(endpoint.getObject(), methodArguments);
+
+            if (useCache) {
+                if (cache == null) {
+                    Cache cacheOptions = method.getAnnotation(Cache.class);
+                    if (cacheOptions != null) {
+                        cache = new dk.cintix.tinyserver.io.cache.Cache<String, String>(cacheOptions.timeToLive(), cacheOptions.size());
+                    } else {
+                        cache = new dk.cintix.tinyserver.io.cache.Cache<String, String>(1);
+                    }
+                }
+
+                String cachedResponseString = new String(response.build());
+                cache.put(requestId, cachedResponseString, cacheType);
+                _CACHE_MAPS.put(cacheBaseId, cache);
+            }
+
+            return response;
         } catch (Exception exception) {
             exception.printStackTrace();
             return new Response().InternalServerError().data(exception.toString());
         }
+    }
+
+    private String baseId(String name) {
+        return new String(Base64.getEncoder().encode(name.getBytes()));
     }
 
     private Object valueFromType(Parameter parameter, String value) throws Exception {
@@ -123,6 +173,16 @@ public class RestAction {
             default:
                 return generator.toModel(value, parameter.getType());
         }
+    }
+
+    private CacheType getCacheStategy(Method method) {
+        if (method.isAnnotationPresent(Static.class)) {
+            return CacheType.STATIC;
+        }
+        if (method.isAnnotationPresent(Cache.class)) {
+            return CacheType.DYNAMIC;
+        }
+        return CacheType.NONE;
     }
 
     @Override

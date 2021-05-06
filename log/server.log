@@ -954,3 +954,1079 @@ Connection: keep-alive
 Content-Length: 77
 
 {"name" : "Michael Martinsen", "pinCode": 1234, "email": "michael@cintix.dk"}
+[LOG][2021-05-06 08:54:21.475] Server start on /0.0.0.0:8080
+[LOG][2021-05-06 08:54:21.475] Listering...
+[LOG][2021-05-06 08:54:42.709] GET / HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-05-06 08:54:42.810] GET /favicon.ico HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: image/webp,*/*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Referer: http://127.0.0.1:8080/
+Sec-GPC: 1
+[LOG][2021-05-06 08:54:52.817] GET /api/hello HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-05-06 08:55:05.980] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-05-06 08:55:08.219] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:55:08.893] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:55:43.070] Server start on /0.0.0.0:8080
+[LOG][2021-05-06 08:55:43.070] Listering...
+[LOG][2021-05-06 08:55:44.569] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:55:49.589] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:55:59.747] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:56:17.316] Server start on /0.0.0.0:8080
+[LOG][2021-05-06 08:56:17.316] Listering...
+[LOG][2021-05-06 08:56:17.755] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:56:38.101] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:57:12.152] Server start on /0.0.0.0:8080
+[LOG][2021-05-06 08:57:12.152] Listering...
+[LOG][2021-05-06 08:57:14.457] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:57:18.612] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:57:23.898] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:57:57.896] Server start on /0.0.0.0:8080
+[LOG][2021-05-06 08:57:57.896] Listering...
+[LOG][2021-05-06 08:58:06.342] Server start on /0.0.0.0:8080
+[LOG][2021-05-06 08:58:06.343] Listering...
+[LOG][2021-05-06 08:58:07.451] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:58:10.657] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:59:12.644] Server start on /0.0.0.0:8080
+[LOG][2021-05-06 08:59:12.644] Listering...
+[LOG][2021-05-06 08:59:14.075] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 08:59:15.316] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[ERROR][2021-05-06 09:01:02.924] java.net.BindException: Address already in use
+[LOG][2021-05-06 09:01:11.402] Server start on /0.0.0.0:8080
+[LOG][2021-05-06 09:01:11.402] Listering...
+[LOG][2021-05-06 09:01:14.019] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:17.037] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:24.825] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:25.069] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:28.425] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:28.640] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:28.786] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:29.022] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:40.553] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:40.719] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:41.056] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:41.232] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:41.436] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:41.647] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:41.804] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:42.047] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:42.202] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:42.446] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:42.965] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:42.980] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:43.018] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:43.052] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:43.083] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:43.116] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:43.139] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-05-06 09:01:43.180] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:43.206] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-05-06 09:01:43.228] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-05-06 09:01:43.467] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.043] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.096] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.134] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.193] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.231] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.250] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.285] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.330] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.352] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-05-06 09:01:44.370] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-05-06 09:01:44.420] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.438] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.480] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.496] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.537] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.562] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.604] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.619] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.655] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.721] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.765] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.788] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-05-06 09:01:44.803] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-05-06 09:01:44.877] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.914] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.936] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:44.997] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:45.052] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:45.101] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:45.162] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:45.216] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:01:45.253] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:02:07.236] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:02:12.998] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:02:16.258] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:02:16.576] GET /api/hello/Michael HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:02:45.570] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+[LOG][2021-05-06 09:04:55.943] Server start on /0.0.0.0:8080
+[LOG][2021-05-06 09:04:55.943] Listering...
+[LOG][2021-05-06 09:04:57.003] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:05:33.169] Server start on /0.0.0.0:8080
+[LOG][2021-05-06 09:05:33.169] Listering...
+[LOG][2021-05-06 09:05:36.412] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:05:44.728] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:05:47.099] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:05:47.310] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:05:47.446] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:05:47.698] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:05:47.809] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:05:48.026] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:05:48.146] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:05:48.351] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:05:48.494] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0
+[LOG][2021-05-06 09:05:48.675] GET /api/hello/world HTTP/1.1
+Host: 127.0.0.1:8080
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+DNT: 1
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+Sec-GPC: 1
+Cache-Control: max-age=0

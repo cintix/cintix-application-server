@@ -53,7 +53,7 @@ public abstract class RestHttpServer {
     private ServerSocketChannel serverSocketChannel;
     private ServerSocket serverSocket;
     private volatile boolean running = true;
-
+    
     public RestHttpServer() {
         if (!pathMapping.containsKey("get")) {
             pathMapping.put("get", new LinkedHashMap<>());
@@ -283,7 +283,7 @@ public abstract class RestHttpServer {
 
     private RestAction locateEndpint(Map<String, RestEndpoint> mapping, String contextPath) throws Exception {
         if (mapping.containsKey(contextPath)) {
-            return new RestAction(mapping.get(contextPath), new LinkedList<String>());
+            return new RestAction(mapping.get(contextPath), new LinkedList<>());
         }
 
         List<String> regexMApping = new LinkedList<>();
