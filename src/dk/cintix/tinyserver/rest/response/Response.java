@@ -7,11 +7,13 @@ import dk.cintix.tinyserver.io.memory.ByteMemoryStream;
 import dk.cintix.tinyserver.model.ModelGenerator;
 import dk.cintix.tinyserver.model.generators.JSONGenerator;
 import dk.cintix.tinyserver.model.generators.TextGenerator;
+import dk.cintix.tinyserver.rest.http.Status;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
+import javax.net.ssl.SSLEngineResult;
 
 /**
  *
@@ -27,6 +29,7 @@ public class Response {
     private Map<String, String> header = new LinkedHashMap<>();
     private byte[] content = new byte[0];
     private String contentType = "application/json";
+
     public Response() {
 
         if (!contextGenerators.containsKey("application/json")) {
@@ -37,6 +40,10 @@ public class Response {
             contextGenerators.put("text/plain", new TextGenerator());
             contextGenerators.put("default", new TextGenerator());
         }
+    }
+
+    public int getStatus() {
+        return status;
     }
 
     public static Map<String, ModelGenerator> getContextGenerators() {
@@ -59,52 +66,52 @@ public class Response {
     }
 
     public Response OK() {
-        status = 200;
+        status = Status.OK.getValue();
         return this;
     }
 
     public Response Created() {
-        status = 201;
+        status = Status.Created.getValue();
         return this;
     }
 
     public Response Accpeted() {
-        status = 202;
+        status = Status.Accpeted.getValue();
         return this;
     }
 
     public Response BadRequest() {
-        status = 400;
+        status = Status.BadRequest.getValue();
         return this;
     }
 
     public Response Unauthorized() {
-        status = 401;
+        status = Status.Unauthorized.getValue();
         return this;
     }
 
     public Response Forbidden() {
-        status = 403;
+        status = Status.Forbidden.getValue();
         return this;
     }
 
     public Response NotFound() {
-        status = 404;
+        status = Status.NotFound.getValue();
         return this;
     }
 
     public Response BadGateway() {
-        status = 502;
+        status = Status.BadGateway.getValue();
         return this;
     }
 
     public Response ServiceUnavailable() {
-        status = 503;
+        status = Status.ServiceUnavailable.getValue();
         return this;
     }
 
     public Response InternalServerError() {
-        status = 500;
+        status = Status.InternalServerError.getValue();
         return this;
     }
 
@@ -114,12 +121,12 @@ public class Response {
     }
 
     public Response MovedPermanently() {
-        status = 301;
+        status = Status.MovedPermanently.getValue();
         return this;
     }
 
     public Response NoContent() {
-        status = 204;
+        status = Status.NoContent.getValue();
         return this;
     }
 
@@ -134,7 +141,7 @@ public class Response {
     }
 
     public Response model(Object object) {
-        ModelGenerator generator = getGenerator();      
+        ModelGenerator generator = getGenerator();
         content = generator.fromModel(object).getBytes();
         return this;
     }

@@ -272,7 +272,7 @@ public abstract class RestHttpServer {
     private Response handleRequestMapping(Map<String, Map<String, RestEndpoint>> pathMapping, RestHttpRequest request) throws Exception {
         String contextPath = request.getContextPath();
         Map<String, RestEndpoint> requestMap = pathMapping.get(request.getMethod().toLowerCase());
-        RestAction restAction = locateEndpint(requestMap, contextPath.trim());
+        RestAction restAction = locateEndpoint(requestMap, contextPath.trim());
 
         if (restAction != null) {
             return restAction.process(request);
@@ -281,7 +281,7 @@ public abstract class RestHttpServer {
         }
     }
 
-    private RestAction locateEndpint(Map<String, RestEndpoint> mapping, String contextPath) throws Exception {
+    private RestAction locateEndpoint(Map<String, RestEndpoint> mapping, String contextPath) throws Exception {
         if (mapping.containsKey(contextPath)) {
             return new RestAction(mapping.get(contextPath), new LinkedList<>());
         }

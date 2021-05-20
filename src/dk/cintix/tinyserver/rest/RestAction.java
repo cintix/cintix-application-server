@@ -6,8 +6,10 @@ import dk.cintix.tinyserver.io.cache.CacheType;
 import dk.cintix.tinyserver.model.ModelGenerator;
 import dk.cintix.tinyserver.rest.annotations.Action;
 import dk.cintix.tinyserver.rest.annotations.Cache;
+import dk.cintix.tinyserver.rest.annotations.CacheByStatus;
 import dk.cintix.tinyserver.rest.annotations.Inject;
 import dk.cintix.tinyserver.rest.annotations.Static;
+import dk.cintix.tinyserver.rest.http.Status;
 import dk.cintix.tinyserver.rest.http.request.RestHttpRequest;
 import dk.cintix.tinyserver.rest.http.utils.HttpUtil;
 import dk.cintix.tinyserver.rest.response.CachedResponse;
@@ -78,7 +80,6 @@ public class RestAction {
 //            System.out.println("requestId " + requestId);
 //            System.out.println("cacheBaseId " + cacheBaseId);
 //            System.out.println("cache created " + (cache != null));
-
             if (useCache && cache != null) {
                 if (cache.contains(requestId)) {
                     CachedResponse response = new CachedResponse(cache.get(requestId).toString().getBytes());
@@ -116,16 +117,22 @@ public class RestAction {
 
             if (useCache) {
                 if (cache == null) {
-                    Cache cacheOptions = method.getAnnotation(Cache.class);
-                    if (cacheOptions != null) {
-                        cache = new dk.cintix.tinyserver.io.cache.Cache<String, String>(cacheOptions.timeToLive(), cacheOptions.size());
-                    } else {
-                        cache = new dk.cintix.tinyserver.io.cache.Cache<String, String>(1);
-                    }
-                }
+                    CacheByStatus cacheByStatus = method.getAnnotation(CacheByStatus.class);
+                    String cachedResponseString = new String(response.build());
 
-                String cachedResponseString = new String(response.build());
-                cache.put(requestId, cachedResponseString, cacheType);
+                    if (cacheByStatus == null) {
+                        cache = new dk.cintix.tinyserver.io.cache.Cache<String, String>(1);
+                    } else {
+                        int currentStatusCode = response.getStatus();
+                        for (Cache cacheOptions : cacheByStatus.value()) {
+                            if (isStatusDefinedInCache(cacheOptions.status(), currentStatusCode)) {
+                                cache = new dk.cintix.tinyserver.io.cache.Cache<String, String>(cacheOptions.timeToLive(), cacheOptions.size());
+                                cache.put(requestId, cachedResponseString, cacheType);
+                            }
+                        }
+                    }
+                    cache.put(requestId, cachedResponseString, cacheType);
+                }
                 _CACHE_MAPS.put(cacheBaseId, cache);
             }
 
@@ -134,6 +141,18 @@ public class RestAction {
             exception.printStackTrace();
             return new Response().InternalServerError().data(exception.toString());
         }
+    }
+
+    private boolean isStatusDefinedInCache(Status[] status, int value) {
+        for (int i = 0; i < status.length; i++) {
+            if (status[i].getValue() == -1) {
+                return true;
+            }
+            if (status[i].getValue() == value) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String baseId(String name) {
