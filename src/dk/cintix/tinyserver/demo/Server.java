@@ -12,17 +12,15 @@ import java.net.InetSocketAddress;
  * @author migo
  */
 public class Server extends RestHttpServer {
-
     private final Log LOG = Log.instance();
 
-    public Server() {
+    private void start() {
         try {
 
             bind(new InetSocketAddress("0.0.0.0", 8080));
             addEndpoint("/api/hello", new HelloWorldRestEndPoint());
-            
-            startServer();
 
+            startServer();
         } catch (Exception exception) {
             exception.printStackTrace();
             LOG.error(exception.toString());
@@ -31,6 +29,7 @@ public class Server extends RestHttpServer {
 
     public static void main(String[] args) {
         Server server = new Server();
+        server.start();
     }
 
 }
