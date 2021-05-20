@@ -2,6 +2,7 @@
  */
 package dk.cintix.tinyserver.rest;
 
+import dk.cintix.tinyserver.io.ReflectionUtil;
 import dk.cintix.tinyserver.io.cache.CacheType;
 import dk.cintix.tinyserver.model.ModelGenerator;
 import dk.cintix.tinyserver.rest.annotations.Action;
@@ -31,7 +32,6 @@ import java.util.Map;
 public class RestAction {
 
     private static final Map<String, dk.cintix.tinyserver.io.cache.Cache> _CACHE_MAPS = new LinkedHashMap<>();
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("YYYY-MM-dd");
     private final List<String> arguments;
     private final RestEndpoint endpoint;
     private ModelGenerator generator;
@@ -76,10 +76,6 @@ public class RestAction {
             boolean useCache = (cacheType != CacheType.NONE);
             dk.cintix.tinyserver.io.cache.Cache cache = _CACHE_MAPS.get(cacheBaseId);
 
-//            System.out.println("useCache " + useCache);
-//            System.out.println("requestId " + requestId);
-//            System.out.println("cacheBaseId " + cacheBaseId);
-//            System.out.println("cache created " + (cache != null));
             if (useCache && cache != null) {
                 if (cache.contains(requestId)) {
                     CachedResponse response = new CachedResponse(cache.get(requestId).toString().getBytes());
@@ -160,37 +156,14 @@ public class RestAction {
     }
 
     private Object valueFromType(Parameter parameter, String value) throws Exception {
+        
         Object obj = value;
-        switch (parameter.getType().getTypeName()) {
-            case "java.lang.String":
-                return value;
-            case "java.util.Date":
-                return dateFormat.parse(value);
-            case "int":
-            case "java.lang.Integer":
-                return Integer.parseInt(value);
-            case "boolean":
-            case "java.lang.Boolean":
-                return Boolean.parseBoolean(value);
-            case "byte":
-            case "java.lang.Byte":
-                return Byte.parseByte(value);
-            case "char":
-                return value.charAt(0);
-            case "long":
-            case "java.lang.Long":
-                return Long.parseLong(value);
-            case "short":
-            case "java.lang.Short":
-                return Short.parseShort(value);
-            case "float":
-            case "java.lang.Float":
-                return Float.parseFloat(value);
-            case "double":
-            case "java.lang.Double":
-                return Double.parseDouble(value);
-            default:
-                return generator.toModel(value, parameter.getType());
+        Object valueFromType = ReflectionUtil.valueFromType(parameter, value);
+        
+        if (valueFromType != null) {
+            return valueFromType;
+        } else {
+            return generator.toModel(value, parameter.getType());
         }
     }
 
