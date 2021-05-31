@@ -19,7 +19,7 @@ public class Server extends RestHttpServer {
 
             bind(new InetSocketAddress("0.0.0.0", 8080));
             addEndpoint("/api/hello", new HelloWorldRestEndPoint());
-
+            
             startServer();
         } catch (Exception exception) {
             exception.printStackTrace();
