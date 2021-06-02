@@ -1,6 +1,5 @@
 package dk.cintix.tinyserver.jdbc;
 
-
 import dk.cintix.tinyserver.jdbc.annotations.Entity;
 import dk.cintix.tinyserver.jdbc.annotations.InjectConnection;
 import java.lang.reflect.Field;
@@ -53,6 +52,28 @@ public class EntityManager {
         return null;
     }
 
+    public static <T> T create(Class<T> instance, TransactionableConnection connection) {
+        T entityManager = (T) getEntityManager(instance);
+        if (entityManager != null) {
+            Field[] fields = entityManager.getClass().getDeclaredFields();
+            for (Field field : fields) {
+                if (field.isAnnotationPresent(InjectConnection.class) && field.getType().isAssignableFrom(Connection.class)) {
+                    field.setAccessible(true);
+                    try {
+                        if (connection != null && !connection.isClosed()) {
+                            field.set(entityManager, connection);
+                        }
+                    } catch (IllegalArgumentException | IllegalAccessException | SQLException ex) {
+                        Logger.getLogger(EntityManager.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+
+                }
+            }
+            return entityManager;
+        }
+        return null;
+    }
+
     /**
      *
      * @param <T>
@@ -67,6 +88,38 @@ public class EntityManager {
             Logger.getLogger(EntityManager.class.getName()).log(Level.SEVERE, null, ex);
         }
         return entityManager;
+    }
+
+    /**
+     *
+     * @param <T>
+     * @param instance
+     * @param connection
+     * @return
+     */
+    public static <T> T instance(Class<T> instance, TransactionableConnection connection) {
+        try {
+            T entityManager = (T) instance.newInstance();
+            Field[] fields = entityManager.getClass().getDeclaredFields();
+            for (Field field : fields) {
+                if (field.isAnnotationPresent(InjectConnection.class) && field.getType().isAssignableFrom(connection.getClass())) {
+                    field.setAccessible(true);
+                    try {
+                        if (connection != null && !connection.isClosed()) {
+                            field.set(entityManager, connection);
+                        }
+                    } catch (IllegalArgumentException | IllegalAccessException | SQLException ex) {
+                        Logger.getLogger(EntityManager.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+            }
+            return entityManager;
+        } catch (InstantiationException ex) {
+            Logger.getLogger(EntityManager.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IllegalAccessException ex) {
+            Logger.getLogger(EntityManager.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return null;
     }
 
     /**
