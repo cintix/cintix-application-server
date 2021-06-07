@@ -2054,3 +2054,6 @@ Connection: keep-alive
 Upgrade-Insecure-Requests: 1
 Sec-GPC: 1
 Cache-Control: max-age=0
+[ERROR][2021-05-31 10:14:43.495] java.net.BindException: Address already in use
+[ERROR][2021-06-02 09:13:40.499] java.lang.ClassNotFoundException: org.postgresql.Driver
+[ERROR][2021-06-02 09:24:56.352] java.lang.IndexOutOfBoundsException: Index -1 out of bounds for length 0
