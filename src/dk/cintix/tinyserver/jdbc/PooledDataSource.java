@@ -83,16 +83,18 @@ public class PooledDataSource implements javax.sql.DataSource {
         List<Connection> deadConnections = new ArrayList<>();
         for (int index = 0; index < usedConnections.size(); index++) {
             Connection connection = usedConnections.get(index);
-            if (connection.isClosed() || !connection.isValid(5)) {
+            if (connection.isClosed() || !connection.isValid(25)) {
                 deadConnections.add(connection);
+                connection.close();
+                connection = null;
                 createConnection(url, user, password);
             }
         }
-        
+
         for (int index = 0; index < deadConnections.size(); index++) {
             usedConnections.remove(deadConnections.get(index));
         }
-        
+
         deadConnections.clear();
         deadConnections = null;
     }
