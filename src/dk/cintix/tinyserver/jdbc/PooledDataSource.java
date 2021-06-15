@@ -20,11 +20,15 @@ public class PooledDataSource implements javax.sql.DataSource {
     private static String url;
     private static String user;
     private static String password;
+
+    private static int INITIAL_POOL_SIZE;
+    private static int timeout = 30000;
+    private static int executorPoolSize = 5;
+    private static int validSocketTimeOut = 25;
+
+    private static ExecutorService executorService;
     private static List<Connection> connectionPool;
     private static final List<Connection> usedConnections = new ArrayList<>();
-    private static int INITIAL_POOL_SIZE;
-    private static ExecutorService executorService;
-    private static int timeout = 30000;
 
     public PooledDataSource(String url, String user, String password, int INITIAL_POOL_SIZE) {
         this.url = url;
@@ -32,7 +36,7 @@ public class PooledDataSource implements javax.sql.DataSource {
         this.password = password;
         this.INITIAL_POOL_SIZE = INITIAL_POOL_SIZE;
         this.connectionPool = new ArrayList<>(INITIAL_POOL_SIZE);
-        executorService = Executors.newFixedThreadPool(5);
+        executorService = Executors.newFixedThreadPool(executorPoolSize);
         try {
 
             for (int index = 0; index < INITIAL_POOL_SIZE; index++) {
@@ -41,6 +45,30 @@ public class PooledDataSource implements javax.sql.DataSource {
         } catch (Exception exception) {
             exception.printStackTrace();
         }
+    }
+    
+    public static int getTimeout() {
+        return timeout;
+    }
+
+    public static void setTimeout(int timeout) {
+        PooledDataSource.timeout = timeout;
+    }
+
+    public static int getExecutorPoolSize() {
+        return executorPoolSize;
+    }
+
+    public static void setExecutorPoolSize(int executorPoolSize) {
+        PooledDataSource.executorPoolSize = executorPoolSize;
+    }
+
+    public static int getValidSocketTimeOut() {
+        return validSocketTimeOut;
+    }
+
+    public static void setValidSocketTimeOut(int validSocketTimeOut) {
+        PooledDataSource.validSocketTimeOut = validSocketTimeOut;
     }
 
     public String getUrl() {
@@ -83,7 +111,7 @@ public class PooledDataSource implements javax.sql.DataSource {
         List<Connection> deadConnections = new ArrayList<>();
         for (int index = 0; index < usedConnections.size(); index++) {
             Connection connection = usedConnections.get(index);
-            if (connection.isClosed() || !connection.isValid(25)) {
+            if (connection.isClosed() || !connection.isValid(validSocketTimeOut)) {
                 deadConnections.add(connection);
                 connection.close();
                 connection = null;
