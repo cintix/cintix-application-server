@@ -2,6 +2,7 @@
  */
 package dk.cintix.tinyserver.rest.http.utils;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,8 +14,13 @@ import java.util.regex.Pattern;
 public class HttpUtil {
 
     public static void parsePostFields(int linesProcessed, String[] requestLines, final Map<String, String> postFields) {
-        if (linesProcessed < (requestLines.length)) {
-            postFields.put("!RAW",  requestLines[linesProcessed]);
+        if (linesProcessed < (requestLines.length)) {            
+            String rawRequest = "";
+            for (int index = linesProcessed; index < requestLines.length-1; index++) {
+                rawRequest += requestLines[index];
+            }
+
+            postFields.put("!RAW", rawRequest);
             String[] postParams = requestLines[linesProcessed++].split("&");
             for (int index = 0; index < postParams.length; index++) {
                 if (postParams[index].contains("=")) {
@@ -44,7 +50,7 @@ public class HttpUtil {
     public static int parseHeaderKeys(String[] requestLines, final Map<String, String> headers, int linesProcessed) {
         for (int index = 1; index < requestLines.length; index++) {
             if (requestLines[index] == null
-                    || requestLines[index] == ""
+                    || requestLines[index].isEmpty()
                     || requestLines[index].charAt(0) == 10
                     || requestLines[index].charAt(0) == 13) {
                 linesProcessed++;

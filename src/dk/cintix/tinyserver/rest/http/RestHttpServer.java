@@ -25,6 +25,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -53,7 +54,7 @@ public abstract class RestHttpServer {
     private ServerSocketChannel serverSocketChannel;
     private ServerSocket serverSocket;
     private volatile boolean running = true;
-    
+
     public RestHttpServer() {
         if (!pathMapping.containsKey("get")) {
             pathMapping.put("get", new LinkedHashMap<>());
@@ -213,11 +214,17 @@ public abstract class RestHttpServer {
         ByteBuffer buffer = ByteBuffer.allocate(1024);
 
         int read = client.read(buffer);
-        if (read == -1) {
-            handleDisconnect(key);
+        String data = "";
+
+        while (read > 0) {
+            if (read == -1) {
+                handleDisconnect(key);
+            }
+            data += new String(Arrays.copyOfRange(buffer.array(), 0, read)).trim();
+            buffer = ByteBuffer.allocate(1024);
+            read = client.read(buffer);
         }
 
-        String data = new String(buffer.array()).trim();
         if (data.length() > 0) {
             notifyEvent(data);
             RestHttpRequest request = parseRequest(restClient, client, data);
@@ -240,12 +247,17 @@ public abstract class RestHttpServer {
         final Map<String, String> queryStrings = new LinkedHashMap<>();
         final Map<String, String> postFields = new LinkedHashMap<>();
         final InputStream inputStream = client.socket().getInputStream();
-
+        
+        
         String contextPath = "";
         String method = "GET";
         String[] requestLines = headerData.split("\n");
         String[] methodAndPath = requestLines[0].split(" ");
         int linesProcessed = 0;
+        
+        
+        int indexOfFormdata = headerData.indexOf("\r\n\r\n");
+        String rawPost = headerData.substring(indexOfFormdata+4);
 
         method = methodAndPath[0].toUpperCase();
         for (int index = 1; index < methodAndPath.length - 1; index++) {
@@ -258,13 +270,10 @@ public abstract class RestHttpServer {
         if (contextPath.endsWith("/")) {
             contextPath = contextPath.substring(0, contextPath.length() - 1);
         }
-        
+
         linesProcessed = HttpUtil.parseHeaderKeys(requestLines, headers, linesProcessed);
         HttpUtil.parsePostFields(linesProcessed, requestLines, postFields);
-
-        RestHttpRequest httpRequest = new RestHttpRequest(headers, queryStrings, postFields, inputStream, method, contextPath, postFields.get("!RAW"));
-        postFields.remove("!RAW");
-
+        RestHttpRequest httpRequest = new RestHttpRequest(headers, queryStrings, postFields, inputStream, method, contextPath, rawPost);
         requestEvent(restClient, httpRequest);
         return httpRequest;
     }

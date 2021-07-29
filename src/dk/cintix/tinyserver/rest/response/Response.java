@@ -13,7 +13,6 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
-import javax.net.ssl.SSLEngineResult;
 
 /**
  *
@@ -21,7 +20,7 @@ import javax.net.ssl.SSLEngineResult;
  */
 public class Response {
 
-    private static Map<String, ModelGenerator> contextGenerators = new TreeMap<>();
+    private final static Map<String, ModelGenerator> contextGenerators = new TreeMap<>();
     private SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z");
     private final Gson gson = new Gson();
 
@@ -30,8 +29,7 @@ public class Response {
     private byte[] content = new byte[0];
     private String contentType = "application/json";
 
-    public Response() {
-
+    static {
         if (!contextGenerators.containsKey("application/json")) {
             contextGenerators.put("application/json", new JSONGenerator());
         }
@@ -40,6 +38,9 @@ public class Response {
             contextGenerators.put("text/plain", new TextGenerator());
             contextGenerators.put("default", new TextGenerator());
         }
+    }
+
+    public Response() {
     }
 
     public int getStatus() {

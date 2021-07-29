@@ -91,7 +91,6 @@ public class RestAction {
                 return new Response().NotFound();
             } else {
                 Map<String, ModelGenerator> contextGenerators = Response.getContextGenerators();
-
                 if (contextGenerators.containsKey(accept)) {
                     generator = contextGenerators.get(accept);
                 } else {
@@ -156,10 +155,8 @@ public class RestAction {
     }
 
     private Object valueFromType(Parameter parameter, String value) throws Exception {
-        
         Object obj = value;
         Object valueFromType = ReflectionUtil.valueFromType(parameter, value);
-        
         if (valueFromType != null) {
             return valueFromType;
         } else {
