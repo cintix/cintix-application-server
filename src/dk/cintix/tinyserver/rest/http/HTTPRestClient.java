@@ -311,7 +311,7 @@ public class HTTPRestClient {
 
             reponseCode = urlConnection.getResponseCode();
             location = urlConnection.getHeaderField("Location");
-            InputStreamReader isr;
+            InputStreamReader isr = null;
 
             try {
                 if (urlConnection.getHeaderField("Content-Encoding") != null && urlConnection.getHeaderField("Content-Encoding").equals("gzip")) {
@@ -324,17 +324,26 @@ public class HTTPRestClient {
                 if (urlConnection.getHeaderField("Content-Encoding") != null && urlConnection.getHeaderField("Content-Encoding").equals("gzip")) {
                     isr = new InputStreamReader(new GZIPInputStream(urlConnection.getErrorStream()));
                 } else {
-                    isr = new InputStreamReader(urlConnection.getErrorStream());
+                    try {
+                        isr = new InputStreamReader(urlConnection.getErrorStream());
+                    } catch (Exception e) {
+                    }
                 }
                 //logger.log(Level.SEVERE, "action() threw an ioException", ioException);
             }
 
             responseHeadersMap = new LinkedHashMap<>();
             responseHeadersMap.put("Response", "" + reponseCode);
-            
+
             for (String headerKey : urlConnection.getHeaderFields().keySet()) {
-                if (headerKey!=null)
-                responseHeadersMap.put(headerKey, urlConnection.getHeaderField(headerKey));
+                if (headerKey != null) {
+                    responseHeadersMap.put(headerKey, urlConnection.getHeaderField(headerKey));
+                }
+            }
+
+            if (isr == null) {
+                urlConnection.disconnect();
+                return sb.toString();
             }
 
             int numCharsRead;

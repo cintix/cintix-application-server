@@ -147,6 +147,7 @@ public abstract class RestHttpServer {
                 while (iterator.hasNext()) {
                     key = iterator.next();
                     iterator.remove();
+
                     if (!key.isValid()) {
                         continue;
                     }
@@ -182,6 +183,7 @@ public abstract class RestHttpServer {
 
     private void handleAccept(ServerSocketChannel mySocket, SelectionKey key) throws Exception {
         SocketChannel client = mySocket.accept();
+        if (client == null) return ;
         RestClient restClient = new RestClient(client);
         key.attach(restClient.getSessionId());
 
@@ -189,6 +191,7 @@ public abstract class RestHttpServer {
         InternalClientSession clientSession = new InternalClientSession(restClient.getSessionId());
 
         client.configureBlocking(false);
+                
         client.register(selector, SelectionKey.OP_READ, clientSession);
         connectedEvent(restClient);
     }
@@ -261,14 +264,14 @@ public abstract class RestHttpServer {
 
         int indexOfFormdata = headerData.indexOf("\r\n\r\n");
         String rawPost = headerData.substring(indexOfFormdata + 4);
-        
+
         if (indexOfFormdata == -1) {
             indexOfFormdata = headerData.indexOf("\n\n");
             if (indexOfFormdata != -1) {
                 rawPost = headerData.substring(indexOfFormdata + 4);
             }
         }
-                
+
         method = methodAndPath[0].toUpperCase();
         for (int index = 1; index < methodAndPath.length - 1; index++) {
             contextPath += methodAndPath[index] + " ";
