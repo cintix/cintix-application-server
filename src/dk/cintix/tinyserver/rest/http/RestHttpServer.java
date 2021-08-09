@@ -25,7 +25,6 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -54,6 +53,7 @@ public abstract class RestHttpServer {
     private ServerSocketChannel serverSocketChannel;
     private ServerSocket serverSocket;
     private volatile boolean running = true;
+    private ByteBuffer dataBuffer = ByteBuffer.allocate(2048);
 
     public RestHttpServer() {
         if (!pathMapping.containsKey("get")) {
@@ -210,19 +210,24 @@ public abstract class RestHttpServer {
         InternalClientSession clientSession = readAttachment(key);
         SocketChannel client = (SocketChannel) key.channel();
         RestClient restClient = clientSessions.get(clientSession.getSessionId());
-
-        ByteBuffer buffer = ByteBuffer.allocate(1024);
-
-        int read = client.read(buffer);
+        dataBuffer.clear();
         String data = "";
 
-        while (read > 0) {
-            if (read == -1) {
-                handleDisconnect(key);
+        int read;
+        int totalRead = 0;
+        int MAX_BYTES = 1024 * 1024 * 5; // 5MB       
+
+        while ((read = client.read(dataBuffer)) > 0) {
+            totalRead += read;
+            if (totalRead > MAX_BYTES) {
+                break;
             }
-            data += new String(Arrays.copyOfRange(buffer.array(), 0, read)).trim();
-            buffer = ByteBuffer.allocate(1024);
-            read = client.read(buffer);
+
+            dataBuffer.flip();
+            byte[] bytes = new byte[dataBuffer.limit()];
+            dataBuffer.get(bytes);
+            data += new String(bytes);
+            dataBuffer.clear();
         }
 
         if (data.length() > 0) {
@@ -247,18 +252,23 @@ public abstract class RestHttpServer {
         final Map<String, String> queryStrings = new LinkedHashMap<>();
         final Map<String, String> postFields = new LinkedHashMap<>();
         final InputStream inputStream = client.socket().getInputStream();
-        
-        
+
         String contextPath = "";
         String method = "GET";
         String[] requestLines = headerData.split("\n");
         String[] methodAndPath = requestLines[0].split(" ");
         int linesProcessed = 0;
-        
-        
-        int indexOfFormdata = headerData.indexOf("\r\n\r\n");
-        String rawPost = headerData.substring(indexOfFormdata+4);
 
+        int indexOfFormdata = headerData.indexOf("\r\n\r\n");
+        String rawPost = headerData.substring(indexOfFormdata + 4);
+        
+        if (indexOfFormdata == -1) {
+            indexOfFormdata = headerData.indexOf("\n\n");
+            if (indexOfFormdata != -1) {
+                rawPost = headerData.substring(indexOfFormdata + 4);
+            }
+        }
+                
         method = methodAndPath[0].toUpperCase();
         for (int index = 1; index < methodAndPath.length - 1; index++) {
             contextPath += methodAndPath[index] + " ";

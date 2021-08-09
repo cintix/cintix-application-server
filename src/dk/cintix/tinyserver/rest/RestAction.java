@@ -18,7 +18,6 @@ import dk.cintix.tinyserver.rest.response.Response;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -155,7 +154,6 @@ public class RestAction {
     }
 
     private Object valueFromType(Parameter parameter, String value) throws Exception {
-        Object obj = value;
         Object valueFromType = ReflectionUtil.valueFromType(parameter, value);
         if (valueFromType != null) {
             return valueFromType;
