@@ -64,7 +64,9 @@ public class RestAction {
                 }
             }
 
-            Method method = endpoint.getMethod();
+            Method original = endpoint.getMethod();
+            Method method = ReflectionUtil.getBestDescribedMethod(endpoint.getMethod(), endpoint.getObject());
+;            
             Parameter[] parameterTypes = method.getParameters();
             Object[] methodArguments = new Object[parameterTypes.length];
 
@@ -107,7 +109,7 @@ public class RestAction {
                 }
             }
 
-            Response response = (Response) method.invoke(endpoint.getObject(), methodArguments);
+            Response response = (Response) original.invoke(endpoint.getObject(), methodArguments);
 
             if (useCache) {
                 if (cache == null) {

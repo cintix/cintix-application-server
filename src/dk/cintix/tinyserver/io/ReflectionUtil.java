@@ -1,5 +1,6 @@
 package dk.cintix.tinyserver.io;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.text.SimpleDateFormat;
 
@@ -10,6 +11,23 @@ import java.text.SimpleDateFormat;
 public class ReflectionUtil {
 
     private static final SimpleDateFormat dateFormat = new SimpleDateFormat("YYYY-MM-dd");
+
+    public static Method getBestDescribedMethod(Method method, Object clz) {
+        if (!method.getDeclaringClass().getSimpleName().equalsIgnoreCase("Object") && !method.getDeclaringClass().equals(clz.getClass())) {
+            try {
+                return method.getDeclaringClass().getMethod(method.getName(), method.getParameterTypes());
+            } catch (NoSuchMethodException | SecurityException securityException) {
+            }
+        }
+        Class<?>[] interfaces = method.getDeclaringClass().getInterfaces();
+        for (Class<?> cl : interfaces) {
+            try {
+                return cl.getMethod(method.getName(), method.getParameterTypes());
+            } catch (Exception ex) {
+            }
+        }
+        return method;
+    }
 
     public static Object valueFromType(Parameter parameter, String value) throws Exception {
         Object obj = value;

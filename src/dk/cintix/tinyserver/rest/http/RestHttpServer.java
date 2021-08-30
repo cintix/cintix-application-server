@@ -7,6 +7,7 @@ import dk.cintix.tinyserver.rest.http.request.RestHttpRequest;
 import dk.cintix.tinyserver.events.HttpRequestEvents;
 import dk.cintix.tinyserver.events.HttpNotificationEvents;
 import dk.cintix.tinyserver.events.HttpConnectionEvents;
+import dk.cintix.tinyserver.io.ReflectionUtil;
 import dk.cintix.tinyserver.rest.RestAction;
 import dk.cintix.tinyserver.rest.RestClient;
 import dk.cintix.tinyserver.rest.RestEndpoint;
@@ -25,6 +26,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -33,6 +35,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,7 +57,7 @@ public abstract class RestHttpServer {
     private ServerSocketChannel serverSocketChannel;
     private ServerSocket serverSocket;
     private volatile boolean running = true;
-    private ByteBuffer dataBuffer = ByteBuffer.allocate(2048);
+    private final ByteBuffer dataBuffer = ByteBuffer.allocate(2048);
 
     public RestHttpServer() {
         if (!pathMapping.containsKey("get")) {
@@ -183,7 +187,9 @@ public abstract class RestHttpServer {
 
     private void handleAccept(ServerSocketChannel mySocket, SelectionKey key) throws Exception {
         SocketChannel client = mySocket.accept();
-        if (client == null) return ;
+        if (client == null) {
+            return;
+        }
         RestClient restClient = new RestClient(client);
         key.attach(restClient.getSessionId());
 
@@ -191,7 +197,7 @@ public abstract class RestHttpServer {
         InternalClientSession clientSession = new InternalClientSession(restClient.getSessionId());
 
         client.configureBlocking(false);
-                
+
         client.register(selector, SelectionKey.OP_READ, clientSession);
         connectedEvent(restClient);
     }
@@ -343,22 +349,23 @@ public abstract class RestHttpServer {
         Method[] methods = endpoint.getClass().getDeclaredMethods();
 
         for (Method method : methods) {
+            Method readFrom = ReflectionUtil.getBestDescribedMethod(method, endpoint);
             String httpMethod = "get";
-
-            if (method.isAnnotationPresent(POST.class)) {
+            
+            if (readFrom.isAnnotationPresent(POST.class)) {
                 httpMethod = "post";
             }
-            if (method.isAnnotationPresent(PUT.class)) {
+            if (readFrom.isAnnotationPresent(PUT.class)) {
                 httpMethod = "put";
             }
-            if (method.isAnnotationPresent(DELETE.class)) {
+            if (readFrom.isAnnotationPresent(DELETE.class)) {
                 httpMethod = "delete";
             }
 
             Map<String, RestEndpoint> httpMethodMap = pathMapping.get(httpMethod);
 
-            if (method.isAnnotationPresent(Action.class)) {
-                Action action = method.getAnnotation(Action.class);
+            if (readFrom.isAnnotationPresent(Action.class)) {
+                Action action = readFrom.getAnnotation(Action.class);
                 String actionPath = action.path();
 
                 if (!actionPath.startsWith("/")) {
