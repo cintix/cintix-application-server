@@ -16,6 +16,7 @@ import dk.cintix.tinyserver.rest.annotations.POST;
 import dk.cintix.tinyserver.rest.annotations.PUT;
 import dk.cintix.tinyserver.rest.annotations.DELETE;
 import dk.cintix.tinyserver.rest.http.session.InternalClientSession;
+import dk.cintix.tinyserver.rest.jsd.JsonServiceDescriptionEngine;
 import dk.cintix.tinyserver.rest.response.Response;
 import java.io.InputStream;
 import java.lang.reflect.Method;
@@ -26,7 +27,6 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -35,8 +35,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,6 +46,7 @@ public abstract class RestHttpServer {
 
     private static final Map<String, Map<String, RestEndpoint>> pathMapping = new LinkedHashMap<>();
     private final Map<String, RestClient> clientSessions = new LinkedHashMap<>();
+    private final Map<String, String> documentationEndpoint = new LinkedHashMap<>();
 
     private HttpConnectionEvents connectionEvents;
     private HttpRequestEvents requestEvents;
@@ -95,6 +94,7 @@ public abstract class RestHttpServer {
     }
 
     public void addEndpoint(String path, Object endpoint) {
+        documentationEndpoint.put(path + "?jsd", JsonServiceDescriptionEngine.generateServiceDefination(path, null, endpoint));
         registerEndpoint(pathMapping, path, endpoint);
     }
 
@@ -284,8 +284,12 @@ public abstract class RestHttpServer {
         }
 
         contextPath = contextPath.trim();
-        contextPath = HttpUtil.parseQueryStrings(contextPath, queryStrings);
-        contextPath = contextPath.trim();
+
+        if (!documentationEndpoint.containsKey(contextPath)) {
+            contextPath = HttpUtil.parseQueryStrings(contextPath, queryStrings);
+            contextPath = contextPath.trim();
+        }
+
         if (contextPath.endsWith("/")) {
             contextPath = contextPath.substring(0, contextPath.length() - 1);
         }
@@ -299,6 +303,11 @@ public abstract class RestHttpServer {
 
     private Response handleRequestMapping(Map<String, Map<String, RestEndpoint>> pathMapping, RestHttpRequest request) throws Exception {
         String contextPath = request.getContextPath();
+
+        if (documentationEndpoint.containsKey(contextPath)) {
+            return new Response().OK().ContentType("application/json").data(documentationEndpoint.get(contextPath));
+        }
+
         Map<String, RestEndpoint> requestMap = pathMapping.get(request.getMethod().toLowerCase());
         RestAction restAction = locateEndpoint(requestMap, contextPath.trim());
 
@@ -351,7 +360,7 @@ public abstract class RestHttpServer {
         for (Method method : methods) {
             Method readFrom = ReflectionUtil.getBestDescribedMethod(method, endpoint);
             String httpMethod = "get";
-            
+
             if (readFrom.isAnnotationPresent(POST.class)) {
                 httpMethod = "post";
             }
