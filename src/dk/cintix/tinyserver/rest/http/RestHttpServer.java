@@ -2,6 +2,7 @@
  */
 package dk.cintix.tinyserver.rest.http;
 
+import dk.cintix.tinyserver.Application;
 import dk.cintix.tinyserver.rest.http.utils.HttpUtil;
 import dk.cintix.tinyserver.rest.http.request.RestHttpRequest;
 import dk.cintix.tinyserver.events.HttpRequestEvents;
@@ -18,6 +19,10 @@ import dk.cintix.tinyserver.rest.annotations.DELETE;
 import dk.cintix.tinyserver.rest.http.session.InternalClientSession;
 import dk.cintix.tinyserver.rest.jsd.JsonServiceDescriptionEngine;
 import dk.cintix.tinyserver.rest.response.Response;
+import dk.cintix.tinyserver.web.MimeTypes;
+import dk.cintix.tinyserver.web.engine.Document;
+import dk.cintix.tinyserver.web.engine.Engine;
+import java.io.File;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
@@ -27,6 +32,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.file.Files;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -57,6 +63,23 @@ public abstract class RestHttpServer {
     private ServerSocket serverSocket;
     private volatile boolean running = true;
     private final ByteBuffer dataBuffer = ByteBuffer.allocate(2048);
+    private String documentRoot = "web";
+
+    static {
+        Application.set("DOCUMENT_ROOT", "web/");
+    }
+
+    public String getDocumentRoot() {
+        if (!documentRoot.trim().endsWith("/")) {
+            documentRoot = documentRoot.trim() + "/";
+        }
+        return documentRoot;
+    }
+
+    public void setDocumentRoot(String documentRoot) {
+        this.documentRoot = documentRoot;
+        Application.set("DOCUMENT_ROOT", getDocumentRoot());
+    }
 
     public RestHttpServer() {
         if (!pathMapping.containsKey("get")) {
@@ -204,14 +227,14 @@ public abstract class RestHttpServer {
 
     private void handleWrite(SelectionKey key) throws Exception {
         InternalClientSession clientSession = readAttachment(key);
-        SocketChannel client = (SocketChannel) key.channel();
-        Response response = clientSession.getResponse();
-        byte[] buildedResponse = response.build();
+        try (SocketChannel client = (SocketChannel) key.channel()) {
+            Response response = clientSession.getResponse();
+            byte[] buildedResponse = response.build();
 
-        ByteBuffer buffer = ByteBuffer.wrap(buildedResponse);
-        client.write(buffer);
-        InternalClientSession newSession = new InternalClientSession(clientSession.getSessionId());
-        client.close();
+            ByteBuffer buffer = ByteBuffer.wrap(buildedResponse);
+            client.write(buffer);
+            InternalClientSession newSession = new InternalClientSession(clientSession.getSessionId());
+        }
         handleDisconnect(key);
     }
 
@@ -301,8 +324,37 @@ public abstract class RestHttpServer {
         return httpRequest;
     }
 
+    private boolean isRequestADocument(String context) {
+        File jailedRoot = new File(documentRoot);
+        File checkFile = new File(getDocumentRoot() + context);
+        if (checkFile.exists()) {
+            if (checkFile.getAbsolutePath().startsWith(jailedRoot.getAbsolutePath())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private Response handleRequestMapping(Map<String, Map<String, RestEndpoint>> pathMapping, RestHttpRequest request) throws Exception {
         String contextPath = request.getContextPath();
+        if (contextPath.equals("")) {
+            contextPath = "index.htm";
+        }
+
+        if (isRequestADocument(contextPath)) {
+            File documentFile = new File(getDocumentRoot() + contextPath);
+            if (contextPath.toLowerCase().endsWith(".htm") || contextPath.toLowerCase().endsWith(".html")) {
+                Document document = Engine.readTemplate(request, documentFile);
+                String contentData = document.getData();
+                return new Response().OK().ContentType("text/html").data(contentData);
+            }
+
+            String fileExt = contextPath.substring(contextPath.lastIndexOf(".") + 1);
+            String contextType = MimeTypes.ContentType(fileExt);
+
+            byte[] fileContent = Files.readAllBytes(documentFile.toPath());
+            return new Response().OK().ContentType(contextType).Content(fileContent);
+        }
 
         if (documentationEndpoint.containsKey(contextPath)) {
             return new Response().OK().ContentType("application/json").data(documentationEndpoint.get(contextPath));

@@ -11,6 +11,7 @@ import dk.cintix.tinyserver.rest.http.Status;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -21,7 +22,7 @@ import java.util.TreeMap;
 public class Response {
 
     private final static Map<String, ModelGenerator> contextGenerators = new TreeMap<>();
-    private SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z");
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH);
     private final Gson gson = new Gson();
 
     private int status = 200;
@@ -147,6 +148,11 @@ public class Response {
         return this;
     }
 
+    public Response Content(byte[] content) {
+        this.content = content;
+        return this;
+    }
+
     public Response data(String data) {
         content = data.getBytes();
         return this;
@@ -158,7 +164,7 @@ public class Response {
         response += "Date: " + dateFormat.format(new Date()) + "\n";
 
         if (!header.containsKey("Server")) {
-            response += "Server: TinyRest/1.0 (Java)\n";
+            response += "Server: TinyRest/1.1 (Java)\n";
         }
 
         for (String key : header.keySet()) {
