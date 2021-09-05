@@ -66,7 +66,7 @@ public abstract class RestHttpServer {
     private String documentRoot = "web";
 
     static {
-        Application.set("DOCUMENT_ROOT", "web/");
+        Application.set("DOCUMENT_ROOT", null);
     }
 
     public String getDocumentRoot() {
@@ -341,7 +341,7 @@ public abstract class RestHttpServer {
             contextPath = "index.htm";
         }
 
-        if (isRequestADocument(contextPath)) {
+        if (isRequestADocument(contextPath) && Application.get("DOCUMENT_ROOT") != null) {
             File documentFile = new File(getDocumentRoot() + contextPath);
             if (contextPath.toLowerCase().endsWith(".htm") || contextPath.toLowerCase().endsWith(".html")) {
                 Document document = Engine.readTemplate(request, documentFile);

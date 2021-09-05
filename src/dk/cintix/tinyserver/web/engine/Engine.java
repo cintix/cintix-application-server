@@ -1,6 +1,5 @@
 package dk.cintix.tinyserver.web.engine;
 
-import dk.cintix.tinyserver.Application;
 import dk.cintix.tinyserver.rest.http.request.RestHttpRequest;
 import dk.cintix.tinyserver.web.tags.Tag;
 import java.io.File;
