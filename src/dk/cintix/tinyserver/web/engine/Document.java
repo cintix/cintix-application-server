@@ -2,7 +2,6 @@ package dk.cintix.tinyserver.web.engine;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  *
