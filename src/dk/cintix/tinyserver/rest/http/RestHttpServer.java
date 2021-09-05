@@ -21,7 +21,7 @@ import dk.cintix.tinyserver.rest.jsd.JsonServiceDescriptionEngine;
 import dk.cintix.tinyserver.rest.response.Response;
 import dk.cintix.tinyserver.web.MimeTypes;
 import dk.cintix.tinyserver.web.engine.Document;
-import dk.cintix.tinyserver.web.engine.Engine;
+import dk.cintix.tinyserver.web.engine.DocumentEngine;
 import java.io.File;
 import java.io.InputStream;
 import java.lang.reflect.Method;
@@ -359,7 +359,7 @@ public abstract class RestHttpServer {
         if (isRequestADocument(contextPath) && Application.get("DOCUMENT_ROOT") != null) {
             File documentFile = new File(getDocumentRoot() + contextPath);
             if (contextPath.toLowerCase().endsWith(".htm") || contextPath.toLowerCase().endsWith(".html")) {
-                Document document = Engine.readTemplate(request, documentFile);
+                Document document = DocumentEngine.readTemplate(request, documentFile);
                 String contentData = document.getData();
                 return new Response().OK().ContentType("text/html").data(contentData);
             }

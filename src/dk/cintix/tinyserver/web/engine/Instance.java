@@ -62,7 +62,7 @@ public class Instance {
 
         if (keySet.contains("data-file")) {
             String filename = Application.get("DOCUMENT_ROOT") + variables.get("data-file");
-            document = Engine.readTemplate(null, new File(filename));
+            document = DocumentEngine.readTemplate(null, new File(filename));
             return new GeneratedHTML(document, tmp);
         }
 

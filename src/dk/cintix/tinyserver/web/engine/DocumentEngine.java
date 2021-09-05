@@ -14,21 +14,30 @@ import java.util.logging.Logger;
  *
  * @author migo
  */
-public class Engine {
+public class DocumentEngine {
 
     private static final Map<File, Long> documentModifiedDate = new LinkedHashMap<>();
     private static final Map<String, Document> documentList = new LinkedHashMap<>();
     private static final Map<String, Class> tagToClass = new LinkedHashMap<>();
-
+    private static String tagPrefix = "<tiny-data";
+    
     public static Tag get(String name) {
         if (tagToClass.containsKey(name)) {
             try {
                 return (Tag) tagToClass.get(name).newInstance();
             } catch (InstantiationException | IllegalAccessException ex) {
-                Logger.getLogger(Engine.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(DocumentEngine.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
         return null;
+    }
+
+    public static String getTagPrefix() {
+        return tagPrefix;
+    }
+
+    public static void setTagPrefix(String tagPrefix) {
+        DocumentEngine.tagPrefix = tagPrefix;
     }
 
     public static void addDataClass(String name, Class<?> tagclass) throws Exception {
@@ -65,7 +74,7 @@ public class Engine {
         int offset = 0;
         while (offset != -1) {
             String searchData = html.toLowerCase();
-            offset = searchData.indexOf("<swag-data", offset);
+            offset = searchData.indexOf(tagPrefix, offset);
 
             if (offset == -1) {
                 break;
@@ -76,7 +85,7 @@ public class Engine {
 
             String variablesData = html.substring(offset, offset + length);
 
-            variablesData = variablesData.replaceAll("<swag-data", "");
+            variablesData = variablesData.replaceAll(tagPrefix, "");
             variablesData = variablesData.replaceAll("/>", "");
 
             String start = html.substring(0, offset);
@@ -152,7 +161,7 @@ public class Engine {
         }
 
         for (String variable : clone.getVariables().keySet()) {
-            Tag tag = Engine.get(variable);
+            Tag tag = DocumentEngine.get(variable);
             if (tag != null) {
                 if (exchange != null) {
                     tag.setPost(postFields);
@@ -171,7 +180,7 @@ public class Engine {
     }
 
     public static void main(String[] args) {
-        Document document = Engine.readTemplate(null, new File("index.htm"));
+        Document document = DocumentEngine.readTemplate(null, new File("index.htm"));
     }
 
 }
