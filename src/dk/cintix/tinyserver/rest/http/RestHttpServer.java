@@ -41,6 +41,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -195,8 +198,16 @@ public abstract class RestHttpServer {
             } finally {
                 selectedKeys.clear();
             }
+            noop();
         }
         return running;
+    }
+
+    private void noop() {
+        try {
+            TimeUnit.NANOSECONDS.sleep(50);
+        } catch (InterruptedException ex) {
+        }
     }
 
     private void handleDisconnect(SelectionKey key) throws Exception {
@@ -248,6 +259,10 @@ public abstract class RestHttpServer {
         int read;
         int totalRead = 0;
         int MAX_BYTES = 1024 * 1024 * 5; // 5MB       
+
+        if (client.socket() == null && client.socket().getInputStream() == null && client.socket().getInputStream().available() < 1) {
+            return;
+        }
 
         while ((read = client.read(dataBuffer)) > 0) {
             totalRead += read;
