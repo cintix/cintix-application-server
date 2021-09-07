@@ -171,7 +171,12 @@ public class Response {
             response += key + ": " + header.get(key) + "\n";
         }
         if (!header.containsKey("Content-Type") && content.length > 0) {
-            response += "Content-Type: " + contentType + "; charset=utf-8\n";
+            response += "Content-Type: " + contentType;
+            if (contentType.toLowerCase().contains("/text")) response += "; charset=utf-8";
+            if (contentType.toLowerCase().contains("/json")) response += "; charset=utf-8";
+            if (contentType.toLowerCase().contains("plain")) response += "; charset=utf-8";
+            if (contentType.toLowerCase().contains("html"))  response += "; charset=utf-8";
+            response += "\n";
         }
 
         if (!header.containsKey("Connection")) {

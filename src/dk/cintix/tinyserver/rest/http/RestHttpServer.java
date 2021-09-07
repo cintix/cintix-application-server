@@ -71,8 +71,8 @@ public abstract class RestHttpServer {
     }
 
     public String getDocumentRoot() {
-        if (!documentRoot.trim().endsWith("/")) {
-            documentRoot = documentRoot.trim() + "/";
+        while (documentRoot.trim().endsWith("/")) {
+            documentRoot = documentRoot.trim().substring(0,-1);
         }
         return documentRoot;
     }
@@ -238,10 +238,11 @@ public abstract class RestHttpServer {
         InternalClientSession clientSession = readAttachment(key);
         try (SocketChannel client = (SocketChannel) key.channel()) {
             Response response = clientSession.getResponse();
-            byte[] buildedResponse = response.build();
+            ByteBuffer buffer = ByteBuffer.wrap(response.build());
+            while(buffer.hasRemaining()) {
+                client.write(buffer);
+            }
 
-            ByteBuffer buffer = ByteBuffer.wrap(buildedResponse);
-            client.write(buffer);
             InternalClientSession newSession = new InternalClientSession(clientSession.getSessionId());
         }
         handleDisconnect(key);
@@ -303,7 +304,11 @@ public abstract class RestHttpServer {
         String[] requestLines = headerData.split("\n");
         String[] methodAndPath = requestLines[0].split(" ");
         int linesProcessed = 0;
-
+/*
+        System.out.println("----------------------------------------------------------------------------");
+        System.out.println(headerData);
+        System.out.println("----------------------------------------------------------------------------\n");
+*/
         int indexOfFormdata = headerData.indexOf("\r\n\r\n");
         String rawPost = headerData.substring(indexOfFormdata + 4);
 
@@ -351,8 +356,13 @@ public abstract class RestHttpServer {
     private Response handleRequestMapping(Map<String, Map<String, RestEndpoint>> pathMapping, RestHttpRequest request) throws Exception {
         String contextPath = request.getContextPath();
         if (contextPath.equals("")) {
-            contextPath = "index.htm";
+            contextPath = "/index.htm";
+            if (!isRequestADocument(contextPath)) {
+                contextPath="/index.html";
+            }
         }
+
+        // System.out.println("----------------- :" + getDocumentRoot() + contextPath);
 
         if (isRequestADocument(contextPath) && Application.get("DOCUMENT_ROOT") != null) {
             File documentFile = new File(getDocumentRoot() + contextPath);
