@@ -12,9 +12,12 @@ import dk.cintix.tinyserver.rest.annotations.POST;
 import dk.cintix.tinyserver.rest.annotations.PUT;
 import dk.cintix.tinyserver.rest.annotations.Static;
 import dk.cintix.tinyserver.rest.http.Status;
+import dk.cintix.tinyserver.rest.jsd.models.ArgumentDefinition;
 import dk.cintix.tinyserver.rest.jsd.models.Cache;
+import dk.cintix.tinyserver.rest.jsd.models.ModelDefinition;
 import dk.cintix.tinyserver.rest.jsd.models.Service;
 import dk.cintix.tinyserver.rest.jsd.models.ServiceAction;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 
@@ -24,7 +27,7 @@ import java.lang.reflect.Parameter;
  */
 public class JsonServiceDescriptionEngine {
 
-    private final static Gson JSON = new GsonBuilder().serializeNulls().create();
+    private final static Gson JSON = new GsonBuilder().create();
 
     /**
      *
@@ -60,9 +63,8 @@ public class JsonServiceDescriptionEngine {
                 }
 
                 for (Parameter parameter : method.getParameters()) {
-                    String argName = parameter.getName();
-                    String argValue = getArgumentDefinition(parameter.getType());
-                    serviceAction.addArgument(argName, argValue);
+                    ArgumentDefinition definition = getArgumentDefinition(parameter.getName(), parameter.getType());
+                    serviceAction.addArgument(definition);
                 }
 
                 if (method.getAnnotation(Static.class) != null) {
@@ -100,33 +102,43 @@ public class JsonServiceDescriptionEngine {
      * @param obj
      * @return
      */
-    private static String getArgumentDefinition(Class obj) {
+    private static ArgumentDefinition getArgumentDefinition(String name, Class obj) {
+        ArgumentDefinition definition = new ArgumentDefinition();
+        definition.setName(name);
+
         switch (obj.getTypeName()) {
             case "int":
-                return "integer";
+                definition.setType("integer");
+                return definition;
             case "boolean":
-                return "boolean";
             case "short":
-                return "short";
             case "long":
-                return "long";
             case "double":
-                return "double";
             case "float":
-                return "float";
             case "byte":
-                return "byte";
+                definition.setType(obj.getTypeName());
+                return definition;
         }
 
         if (obj.getTypeName().startsWith("java.lang.")) {
-            return obj.getSimpleName().toLowerCase();
+            definition.setType(obj.getSimpleName().toLowerCase());
+            return definition;
         }
 
         try {
-            return JSON.toJson(obj.getDeclaredConstructor().newInstance());
+            Field[] declaredFields = obj.getDeclaredFields();
+            definition.setType("class");
+            ModelDefinition modelDefinition = new ModelDefinition();
+            for (Field field : declaredFields) {
+                modelDefinition.addDefinition(getArgumentDefinition(field.getName(), field.getType()));
+            }
+
+            definition.setModel(modelDefinition);
+            return definition;
         } catch (Exception ex) {
+            ex.printStackTrace();
         }
-        return "";
+        return null;
     }
 
 }

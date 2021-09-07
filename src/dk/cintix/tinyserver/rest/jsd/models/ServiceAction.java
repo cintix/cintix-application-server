@@ -3,9 +3,7 @@
 package dk.cintix.tinyserver.rest.jsd.models;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @author cix
@@ -21,10 +19,10 @@ public class ServiceAction {
     private String accepts = "*/*";
 
     private final List<Cache> caching = new ArrayList<>();
-    private final Map<String, String> arguments = new LinkedHashMap<>();
+    private final List<ArgumentDefinition> arguments = new ArrayList<>();
 
-    public void addArgument(String name, String action) {
-        arguments.put(name, action);
+    public void addArgument(ArgumentDefinition action) {
+        arguments.add(action);
     }
 
     public void addCache(Cache cache) {
@@ -47,7 +45,7 @@ public class ServiceAction {
         this.uri = uri;
     }
 
-    public Map<String, String> getArguments() {
+    public List<ArgumentDefinition> getArguments() {
         return arguments;
     }
 
