@@ -40,6 +40,8 @@ public class HttpUtil {
                 if (queryStrins[index].contains("=")) {
                     String[] keyValue = queryStrins[index].split("=");
                     queryStrings.put(keyValue[0], (keyValue[1] != null) ? keyValue[1].trim() : "");
+                } else {
+                    queryStrings.put(queryStrins[index], "");
                 }
             }
             return contextPath.substring(0, offset);

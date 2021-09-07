@@ -27,8 +27,6 @@ import java.lang.reflect.Parameter;
  */
 public class JsonServiceDescriptionEngine {
 
-    private final static Gson JSON = new GsonBuilder().create();
-
     /**
      *
      * @param uri
@@ -36,7 +34,7 @@ public class JsonServiceDescriptionEngine {
      * @param endpointObject
      * @return
      */
-    public static String generateServiceDefination(String uri, String name, Object endpointObject) {
+    public static Service generateServiceDefination(String uri, String name, Object endpointObject) {
         Class endpoint = endpointObject.getClass();
 
         Service service = new Service();
@@ -94,7 +92,7 @@ public class JsonServiceDescriptionEngine {
 
         }
 
-        return JSON.toJson(service);
+        return service;
     }
 
     /**

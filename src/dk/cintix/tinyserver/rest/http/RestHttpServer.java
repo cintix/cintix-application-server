@@ -18,6 +18,8 @@ import dk.cintix.tinyserver.rest.annotations.PUT;
 import dk.cintix.tinyserver.rest.annotations.DELETE;
 import dk.cintix.tinyserver.rest.http.session.InternalClientSession;
 import dk.cintix.tinyserver.rest.jsd.JsonServiceDescriptionEngine;
+import dk.cintix.tinyserver.rest.jsd.models.API;
+import dk.cintix.tinyserver.rest.jsd.models.Service;
 import dk.cintix.tinyserver.rest.response.Response;
 import dk.cintix.tinyserver.web.MimeTypes;
 import dk.cintix.tinyserver.web.engine.Document;
@@ -53,7 +55,7 @@ public abstract class RestHttpServer {
 
     private static final Map<String, Map<String, RestEndpoint>> pathMapping = new LinkedHashMap<>();
     private final Map<String, RestClient> clientSessions = new LinkedHashMap<>();
-    private final Map<String, String> documentationEndpoint = new LinkedHashMap<>();
+    private final Map<String, Service> documentationEndpoint = new LinkedHashMap<>();
 
     private HttpConnectionEvents connectionEvents;
     private HttpRequestEvents requestEvents;
@@ -72,7 +74,7 @@ public abstract class RestHttpServer {
 
     public String getDocumentRoot() {
         while (documentRoot.trim().endsWith("/")) {
-            documentRoot = documentRoot.trim().substring(0,-1);
+            documentRoot = documentRoot.trim().substring(0, -1);
         }
         return documentRoot;
     }
@@ -239,7 +241,7 @@ public abstract class RestHttpServer {
         try (SocketChannel client = (SocketChannel) key.channel()) {
             Response response = clientSession.getResponse();
             ByteBuffer buffer = ByteBuffer.wrap(response.build());
-            while(buffer.hasRemaining()) {
+            while (buffer.hasRemaining()) {
                 client.write(buffer);
             }
 
@@ -304,11 +306,11 @@ public abstract class RestHttpServer {
         String[] requestLines = headerData.split("\n");
         String[] methodAndPath = requestLines[0].split(" ");
         int linesProcessed = 0;
-/*
+        /*
         System.out.println("----------------------------------------------------------------------------");
         System.out.println(headerData);
         System.out.println("----------------------------------------------------------------------------\n");
-*/
+         */
         int indexOfFormdata = headerData.indexOf("\r\n\r\n");
         String rawPost = headerData.substring(indexOfFormdata + 4);
 
@@ -355,15 +357,27 @@ public abstract class RestHttpServer {
 
     private Response handleRequestMapping(Map<String, Map<String, RestEndpoint>> pathMapping, RestHttpRequest request) throws Exception {
         String contextPath = request.getContextPath();
+        if ((contextPath.trim().toLowerCase().equals("") || contextPath.trim().toCharArray().equals("/")) && request.getQueryStrings().containsKey("jsd")) {
+            API api = new API();
+            for (Service service : documentationEndpoint.values()) {
+                api.addService(service);
+            }
+            return new Response().OK().ContentType("application/json").model(api);
+
+        }
+
+        if (documentationEndpoint.containsKey(contextPath)) {
+            return new Response().OK().ContentType("application/json").model(documentationEndpoint.get(contextPath));
+        }
+        
         if (contextPath.equals("")) {
             contextPath = "/index.htm";
             if (!isRequestADocument(contextPath)) {
-                contextPath="/index.html";
+                contextPath = "/index.html";
             }
         }
 
         // System.out.println("----------------- :" + getDocumentRoot() + contextPath);
-
         if (isRequestADocument(contextPath) && Application.get("DOCUMENT_ROOT") != null) {
             File documentFile = new File(getDocumentRoot() + contextPath);
             if (contextPath.toLowerCase().endsWith(".htm") || contextPath.toLowerCase().endsWith(".html")) {
@@ -377,10 +391,6 @@ public abstract class RestHttpServer {
 
             byte[] fileContent = Files.readAllBytes(documentFile.toPath());
             return new Response().OK().ContentType(contextType).Content(fileContent);
-        }
-
-        if (documentationEndpoint.containsKey(contextPath)) {
-            return new Response().OK().ContentType("application/json").data(documentationEndpoint.get(contextPath));
         }
 
         Map<String, RestEndpoint> requestMap = pathMapping.get(request.getMethod().toLowerCase());
