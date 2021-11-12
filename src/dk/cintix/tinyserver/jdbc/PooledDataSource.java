@@ -134,6 +134,11 @@ public class PooledDataSource implements javax.sql.DataSource {
     @Override
     public Connection getConnection() throws SQLException {
         validatePool();
+        
+        if (connectionPool.size() == 0) {
+            throw new SQLException("Could not get a new connetion from the connection pool!");
+        }
+        
         Connection connection = connectionPool.remove(connectionPool.size() - 1);
         usedConnections.add(connection);
         return connection;

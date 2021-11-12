@@ -4,7 +4,6 @@ package dk.cintix.tinyserver.web;
 
 import java.util.Map;
 import java.util.TreeMap;
-import jdk.nashorn.internal.ir.annotations.Immutable;
 
 /**
  *
