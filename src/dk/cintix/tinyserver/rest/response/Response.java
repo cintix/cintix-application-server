@@ -3,17 +3,23 @@
 package dk.cintix.tinyserver.rest.response;
 
 import com.google.gson.Gson;
+import dk.cintix.tinyserver.Application;
 import dk.cintix.tinyserver.io.memory.ByteMemoryStream;
 import dk.cintix.tinyserver.model.ModelGenerator;
 import dk.cintix.tinyserver.model.generators.JSONGenerator;
 import dk.cintix.tinyserver.model.generators.TextGenerator;
 import dk.cintix.tinyserver.rest.http.Status;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -145,6 +151,20 @@ public class Response {
     public Response model(Object object) {
         ModelGenerator generator = getGenerator();
         content = generator.fromModel(object).getBytes();
+        return this;
+    }
+
+    public Response document(String name) {
+        contentType = "text/html";
+        String path = Application.get("DOCUMENT_ROOT");
+        File file = new File(path + "/" + name);
+        if (file.exists()) {
+            try {
+                content = Files.readAllBytes(file.toPath());
+            } catch (IOException ex) {
+                Logger.getLogger(Response.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
         return this;
     }
 

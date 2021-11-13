@@ -81,6 +81,10 @@ public abstract class RestHttpServer {
 
     public void setDocumentRoot(String documentRoot) {
         this.documentRoot = documentRoot;
+        if (documentRoot !=null && !documentRoot.isEmpty())
+        while (documentRoot.trim().endsWith("/")) {
+            documentRoot = documentRoot.trim().substring(0, -1);
+        }
         Application.set("DOCUMENT_ROOT", getDocumentRoot());
     }
 
