@@ -57,6 +57,12 @@ public class RestHttpRequest {
         customObjects.put(key, obj);
     }
     
+    public void clearCustom(String key) {
+        if (customObjects.containsKey(key)){
+            customObjects.remove(key);
+        }
+    }
+    
     public Object getCustom(String key) {
         if (customObjects.containsKey(key)){
             return customObjects.get(key);
