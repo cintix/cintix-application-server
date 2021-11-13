@@ -14,6 +14,15 @@ public abstract class Tag {
     protected Map<String, String> query;
     protected Map<String, String> request;
     protected Map<String, String> post;
+    private Map<String, Object> customObjects;
+
+    public Map<String, Object> getCustomObjects() {
+        return customObjects;
+    }
+
+    public void setCustomObjects(Map<String, Object> customObjects) {
+        this.customObjects = customObjects;
+    }
 
     public Map<String, String> getQuery() {
         return query;

@@ -387,6 +387,7 @@ public abstract class RestHttpServer {
             if (contextPath.toLowerCase().endsWith(".htm") || contextPath.toLowerCase().endsWith(".html")) {
                 Document document = DocumentEngine.readTemplate(request, documentFile);
                 String contentData = document.getData();
+                document = null;
                 return new Response().OK().ContentType("text/html").data(contentData);
             }
 

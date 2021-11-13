@@ -3,6 +3,7 @@
 package dk.cintix.tinyserver.rest.http.request;
 
 import java.io.InputStream;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -14,6 +15,7 @@ public class RestHttpRequest {
     private final Map<String, String> headers;
     private final Map<String, String> queryStrings;
     private final Map<String, String> postParams;
+    private final Map<String, Object> customObjects;
     private final InputStream inputStream;
     private final String contextPath;
     private final String method;
@@ -27,6 +29,7 @@ public class RestHttpRequest {
         this.contextPath = contextPath;
         this.method = method;
         this.rawPost = rawPost;
+        this.customObjects = new HashMap<>();
     }
 
     public String getHeader(String key) {
@@ -48,6 +51,21 @@ public class RestHttpRequest {
             return postParams.get(key);
         }
         return null;
+    }
+    
+    public void addCustom(String key, Object obj){
+        customObjects.put(key, obj);
+    }
+    
+    public Object getCustom(String key) {
+        if (customObjects.containsKey(key)){
+            return customObjects.get(key);
+        }
+        return null;
+    }
+
+    public Map<String, Object> getCustomObjects() {
+        return customObjects;
     }
 
     public Map<String, String> getHeaders() {

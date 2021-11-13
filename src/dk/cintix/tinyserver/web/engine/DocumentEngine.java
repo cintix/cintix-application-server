@@ -167,6 +167,7 @@ public class DocumentEngine {
                     tag.setPost(postFields);
                     tag.setQuery(requestQueryStrings);
                     tag.setRequest(requestFields);
+                    tag.setCustomObjects(exchange.getCustomObjects());
                 }
                 Instance instance = clone.getVariables().get(variable);
                 clone.replace(instance, tag.toHTML(clone.getVariables()));

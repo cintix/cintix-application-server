@@ -9,6 +9,9 @@ import dk.cintix.tinyserver.model.ModelGenerator;
 import dk.cintix.tinyserver.model.generators.JSONGenerator;
 import dk.cintix.tinyserver.model.generators.TextGenerator;
 import dk.cintix.tinyserver.rest.http.Status;
+import dk.cintix.tinyserver.rest.http.request.RestHttpRequest;
+import dk.cintix.tinyserver.web.engine.Document;
+import dk.cintix.tinyserver.web.engine.DocumentEngine;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -154,14 +157,16 @@ public class Response {
         return this;
     }
 
-    public Response document(String name) {
+    public Response document(RestHttpRequest request, String name) {
         contentType = "text/html";
         String path = Application.get("DOCUMENT_ROOT");
         File file = new File(path + "/" + name);
         if (file.exists()) {
             try {
-                content = Files.readAllBytes(file.toPath());
-            } catch (IOException ex) {
+                Document document = DocumentEngine.readTemplate(request, file);
+                content = document.getData().getBytes();
+                document = null;
+            } catch (Exception ex) {
                 Logger.getLogger(Response.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
