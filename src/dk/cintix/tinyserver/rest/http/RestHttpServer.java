@@ -349,7 +349,7 @@ public abstract class RestHttpServer {
         String subdomain = headers.get("HOST");
         if (subdomain.contains(".")) {
             subdomain = subdomain.substring(0, subdomain.indexOf("."));
-            httpRequest.addHeader("subdomain", subdomain);
+            httpRequest.addHeader("SUBDOMAIN", subdomain);
         }
         
         return httpRequest;
