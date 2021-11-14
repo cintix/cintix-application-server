@@ -2,6 +2,7 @@
  */
 package dk.cintix.tinyserver.web.tags;
 
+import dk.cintix.tinyserver.rest.http.request.RestHttpRequest;
 import dk.cintix.tinyserver.web.engine.Instance;
 import java.util.Map;
 
@@ -11,41 +12,26 @@ import java.util.Map;
  */
 public abstract class Tag {
 
-    protected Map<String, String> query;
-    protected Map<String, String> request;
-    protected Map<String, String> post;
-    private Map<String, Object> customObjects;
+    private RestHttpRequest httpRequest;
 
-    public Map<String, Object> getCustomObjects() {
-        return customObjects;
+    public void setHttpRequest(RestHttpRequest httpRequest) {
+        this.httpRequest = httpRequest;
     }
 
-    public void setCustomObjects(Map<String, Object> customObjects) {
-        this.customObjects = customObjects;
+    public Map<String, Object> getCustomObjects() {
+        return httpRequest.getCustomObjects();
     }
 
     public Map<String, String> getQuery() {
-        return query;
-    }
-
-    public void setQuery(Map<String, String> query) {
-        this.query = query;
-    }
-
-    public Map<String, String> getRequest() {
-        return request;
-    }
-
-    public void setRequest(Map<String, String> request) {
-        this.request = request;
+        return httpRequest.getQueryStrings();
     }
 
     public Map<String, String> getPost() {
-        return post;
+        return httpRequest.getPostParams();
     }
 
-    public void setPost(Map<String, String> post) {
-        this.post = post;
+    public String getHeader(String name) {
+        return httpRequest.getHeader(name);
     }
 
     public abstract String toHTML(Map<String, Instance> variables);
