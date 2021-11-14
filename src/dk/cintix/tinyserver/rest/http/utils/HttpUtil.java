@@ -59,7 +59,7 @@ public class HttpUtil {
                 break;
             }
             String[] keyValue = requestLines[index].split(":");
-            headers.put(keyValue[0], (keyValue[1] != null) ? keyValue[1].trim() : "");
+            headers.put(keyValue[0].toUpperCase().trim(), (keyValue[1] != null) ? keyValue[1].trim() : "");
             linesProcessed++;
         }
         linesProcessed++;

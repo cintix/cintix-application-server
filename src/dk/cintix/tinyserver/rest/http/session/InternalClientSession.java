@@ -3,6 +3,8 @@
 package dk.cintix.tinyserver.rest.http.session;
 
 import dk.cintix.tinyserver.rest.response.Response;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  *
@@ -12,6 +14,7 @@ public class InternalClientSession {
 
     private String sessionId;
     private Response response;
+    private final Map<String, Object> keys = new LinkedHashMap<>();
 
     public InternalClientSession() {
     }
@@ -39,6 +42,17 @@ public class InternalClientSession {
 
     public void setResponse(Response response) {
         this.response = response;
+    }
+
+    public void add(String key, Object obj) {
+        keys.put(key, obj);
+    }
+
+    public Object get(String key) {
+        if (keys.containsKey(key)) {
+            return keys.get(key);
+        }
+        return null;
     }
 
     @Override

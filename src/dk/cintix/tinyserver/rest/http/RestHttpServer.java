@@ -81,9 +81,10 @@ public abstract class RestHttpServer {
 
     public void setDocumentRoot(String documentRoot) {
         this.documentRoot = documentRoot;
-        if (documentRoot !=null && !documentRoot.isEmpty())
-        while (documentRoot.trim().endsWith("/")) {
-            documentRoot = documentRoot.trim().substring(0, -1);
+        if (documentRoot != null && !documentRoot.isEmpty()) {
+            while (documentRoot.trim().endsWith("/")) {
+                documentRoot = documentRoot.trim().substring(0, -1);
+            }
         }
         Application.set("DOCUMENT_ROOT", getDocumentRoot());
     }
@@ -242,7 +243,7 @@ public abstract class RestHttpServer {
 
     private void handleWrite(SelectionKey key) throws Exception {
         InternalClientSession clientSession = readAttachment(key);
-        try (SocketChannel client = (SocketChannel) key.channel()) {
+        try ( SocketChannel client = (SocketChannel) key.channel()) {
             Response response = clientSession.getResponse();
             ByteBuffer buffer = ByteBuffer.wrap(response.build());
             while (buffer.hasRemaining()) {
@@ -345,6 +346,12 @@ public abstract class RestHttpServer {
         HttpUtil.parsePostFields(linesProcessed, requestLines, postFields);
         RestHttpRequest httpRequest = new RestHttpRequest(headers, queryStrings, postFields, inputStream, method, contextPath, rawPost);
         requestEvent(restClient, httpRequest);
+        String subdomain = headers.get("HOST");
+        if (subdomain.contains(".")) {
+            subdomain = subdomain.substring(0, subdomain.indexOf("."));
+            httpRequest.addHeader("subdomain", subdomain);
+        }
+        
         return httpRequest;
     }
 
@@ -373,7 +380,7 @@ public abstract class RestHttpServer {
         if (documentationEndpoint.containsKey(contextPath)) {
             return new Response().OK().ContentType("application/json").model(documentationEndpoint.get(contextPath));
         }
-        
+
         if (contextPath.equals("")) {
             contextPath = "/index.htm";
             if (!isRequestADocument(contextPath)) {

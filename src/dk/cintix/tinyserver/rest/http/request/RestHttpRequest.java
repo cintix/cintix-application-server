@@ -97,6 +97,10 @@ public class RestHttpRequest {
     public String getMethod() {
         return method;
     }
+    
+    public void addHeader(String key, String value) {
+        headers.put(key, value);
+    }
 
     public String getContentType() {
         for (String key : headers.keySet()) {
