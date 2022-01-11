@@ -1,1 +1,2 @@
-# tiny-tim-server
+# cintix-application-server
+Small appliation server based on rest 
