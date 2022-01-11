@@ -134,6 +134,11 @@ public class Response {
         return this;
     }
 
+    public Response MovedTemporary() {
+        status = Status.MovedTemporary.getValue();
+        return this;
+    }
+
     public Response MovedPermanently() {
         status = Status.MovedPermanently.getValue();
         return this;
@@ -199,7 +204,7 @@ public class Response {
         response += "Date: " + dateFormat.format(new Date()) + "\n";
 
         if (!header.containsKey("Server")) {
-            response += "Server: TinyRest/1.1 (Java)\n";
+            response += "Server: Cintix-Application-Server(CAS)/1.5\n";
         }
 
         for (String key : header.keySet()) {
@@ -252,6 +257,10 @@ public class Response {
         if (code == 301) {
             return "Moved Permanently";
         }
+        if (code == 302) {
+            return "Temporary Redirect";
+        }
+
         if (code == 400) {
             return "Bad Request";
         }

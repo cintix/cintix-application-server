@@ -17,6 +17,7 @@ public enum Status {
     ServiceUnavailable(503),
     InternalServerError(500),
     MovedPermanently(301),
+    MovedTemporary(302),
     NoContent(204),
     All(-1);
     
