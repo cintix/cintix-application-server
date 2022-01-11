@@ -22,9 +22,9 @@ import dk.cintix.application.server.rest.jsd.models.API;
 import dk.cintix.application.server.rest.jsd.models.Service;
 import dk.cintix.application.server.rest.response.Response;
 import dk.cintix.application.server.web.MimeTypes;
-import dk.cintix.application.server.web.engine.Document;
-import dk.cintix.application.server.web.engine.DocumentEngine;
+import dk.cintix.html.engine.HTMLEngine;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
@@ -43,6 +43,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -79,6 +80,17 @@ public abstract class RestHttpServer {
         return documentRoot;
     }
 
+    public void setTagsNamespace(String name) {
+        HTMLEngine.setNamespace(name);
+    }
+    
+    public void addTagClass(String name, Class<?> cls) {
+        try {
+            HTMLEngine.addClass(name, cls);
+        } catch (IOException iOException) {
+        }
+    }
+            
     public void setDocumentRoot(String documentRoot) {
         this.documentRoot = documentRoot;
         if (documentRoot != null && !documentRoot.isEmpty()) {
@@ -351,7 +363,7 @@ public abstract class RestHttpServer {
             subdomain = subdomain.substring(0, subdomain.indexOf("."));
             httpRequest.addHeader("SUBDOMAIN", subdomain);
         }
-        
+
         return httpRequest;
     }
 
@@ -391,10 +403,12 @@ public abstract class RestHttpServer {
         // System.out.println("----------------- :" + getDocumentRoot() + contextPath);
         if (isRequestADocument(contextPath) && Application.get("DOCUMENT_ROOT") != null) {
             File documentFile = new File(getDocumentRoot() + contextPath);
-            if (contextPath.toLowerCase().endsWith(".htm") || contextPath.toLowerCase().endsWith(".html")) {
-                Document document = DocumentEngine.readTemplate(request, documentFile);
-                String contentData = document.getData();
-                document = null;
+            if (contextPath.toLowerCase().endsWith(".htm") || contextPath.toLowerCase().endsWith(".html")) {              
+//                System.out.println("=============== " + documentFile + " ====================");              
+                Map<String, String> properties = new TreeMap<>();
+                properties.putAll(request.getPostParams());
+                properties.putAll(request.getPostParams());
+                String contentData = HTMLEngine.process(documentFile, properties);
                 return new Response().OK().ContentType("text/html").data(contentData);
             }
 

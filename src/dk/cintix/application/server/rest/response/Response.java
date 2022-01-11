@@ -10,8 +10,7 @@ import dk.cintix.application.server.model.generators.JSONGenerator;
 import dk.cintix.application.server.model.generators.TextGenerator;
 import dk.cintix.application.server.rest.http.Status;
 import dk.cintix.application.server.rest.http.request.RestHttpRequest;
-import dk.cintix.application.server.web.engine.Document;
-import dk.cintix.application.server.web.engine.DocumentEngine;
+import dk.cintix.html.engine.HTMLEngine;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -31,6 +30,7 @@ public class Response {
     private final static Map<String, ModelGenerator> contextGenerators = new TreeMap<>();
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH);
     private final Gson gson = new Gson();
+    private final Map<String, String> variables = new TreeMap<>();
 
     private int status = 200;
     private Map<String, String> header = new LinkedHashMap<>();
@@ -72,6 +72,11 @@ public class Response {
 
     public static void registerModelGenerator(String contentType, ModelGenerator mg) {
         contextGenerators.put(contentType, mg);
+    }
+
+    public Response variable(String name, String value) {
+        variables.put("@" + name, value);
+        return this;
     }
 
     public Response OK() {
@@ -166,9 +171,11 @@ public class Response {
         File file = new File(path + "/" + name);
         if (file.exists()) {
             try {
-                Document document = DocumentEngine.readTemplate(request, file);
-                content = document.getData().getBytes();
-                document = null;
+                Map<String, String> properties = new TreeMap<>();
+                properties.putAll(request.getPostParams());
+                properties.putAll(request.getPostParams());
+                properties.putAll(variables);
+                content = HTMLEngine.process(file, properties).getBytes();
             } catch (Exception ex) {
                 Logger.getLogger(Response.class.getName()).log(Level.SEVERE, null, ex);
             }
