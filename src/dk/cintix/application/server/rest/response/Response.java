@@ -13,8 +13,6 @@ import dk.cintix.application.server.rest.http.request.RestHttpRequest;
 import dk.cintix.application.server.web.engine.Document;
 import dk.cintix.application.server.web.engine.DocumentEngine;
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -146,6 +144,11 @@ public class Response {
         return this;
     }
 
+    public Response Location(String uri) {
+        header.put("Location", uri);
+        return this;
+    }
+
     public Response ContentType(String content) {
         contentType = content;
         return this;
@@ -197,10 +200,18 @@ public class Response {
         }
         if (!header.containsKey("Content-Type") && content.length > 0) {
             response += "Content-Type: " + contentType;
-            if (contentType.toLowerCase().contains("/text")) response += "; charset=utf-8";
-            if (contentType.toLowerCase().contains("/json")) response += "; charset=utf-8";
-            if (contentType.toLowerCase().contains("plain")) response += "; charset=utf-8";
-            if (contentType.toLowerCase().contains("html"))  response += "; charset=utf-8";
+            if (contentType.toLowerCase().contains("/text")) {
+                response += "; charset=utf-8";
+            }
+            if (contentType.toLowerCase().contains("/json")) {
+                response += "; charset=utf-8";
+            }
+            if (contentType.toLowerCase().contains("plain")) {
+                response += "; charset=utf-8";
+            }
+            if (contentType.toLowerCase().contains("html")) {
+                response += "; charset=utf-8";
+            }
             response += "\n";
         }
 
