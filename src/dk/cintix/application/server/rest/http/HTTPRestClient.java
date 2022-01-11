@@ -270,7 +270,7 @@ public class HTTPRestClient {
 
     public String action(String method, String path, String data) {
         try {
-            System.out.println("host + path " + host + path);
+            //System.out.println("host + path " + host + path);
             URL remoteURL = new URL(host + path);
             HttpURLConnection urlConnection = (HttpURLConnection) remoteURL.openConnection();
             HttpURLConnection.setFollowRedirects(true);
