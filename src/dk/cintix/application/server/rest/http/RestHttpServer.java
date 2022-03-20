@@ -83,14 +83,14 @@ public abstract class RestHttpServer {
     public void setTagsNamespace(String name) {
         HTMLEngine.setNamespace(name);
     }
-    
+
     public void addTagClass(String name, Class<?> cls) {
         try {
             HTMLEngine.addClass(name, cls);
         } catch (IOException iOException) {
         }
     }
-            
+
     public void setDocumentRoot(String documentRoot) {
         this.documentRoot = documentRoot;
         if (documentRoot != null && !documentRoot.isEmpty()) {
@@ -403,12 +403,16 @@ public abstract class RestHttpServer {
         // System.out.println("----------------- :" + getDocumentRoot() + contextPath);
         if (isRequestADocument(contextPath) && Application.get("DOCUMENT_ROOT") != null) {
             File documentFile = new File(getDocumentRoot() + contextPath);
-            if (contextPath.toLowerCase().endsWith(".htm") || contextPath.toLowerCase().endsWith(".html")) {              
+            if (contextPath.toLowerCase().endsWith(".htm") || contextPath.toLowerCase().endsWith(".html")) {
 //                System.out.println("=============== " + documentFile + " ====================");              
                 Map<String, String> properties = new TreeMap<>();
                 properties.putAll(request.getPostParams());
                 properties.putAll(request.getPostParams());
-                String contentData = HTMLEngine.process(documentFile, properties);
+
+                Map<String, Object> resources = new TreeMap<>();
+                resources.put(RestHttpRequest.class.getName(), request);
+
+                String contentData = HTMLEngine.process(documentFile, properties, resources);
                 return new Response().OK().ContentType("text/html").data(contentData);
             }
 

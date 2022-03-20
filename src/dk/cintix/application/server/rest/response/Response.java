@@ -180,7 +180,9 @@ public class Response {
                 properties.putAll(request.getPostParams());
                 properties.putAll(request.getPostParams());
                 properties.putAll(variables);
-                content = HTMLEngine.process(file, properties).getBytes();
+                Map<String, Object> resources = new TreeMap<>();
+                resources.put(RestHttpRequest.class.getName(), request);                
+                content = HTMLEngine.process(file, properties, resources).getBytes();
             } catch (Exception ex) {
                 Logger.getLogger(Response.class.getName()).log(Level.SEVERE, null, ex);
             }
