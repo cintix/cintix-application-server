@@ -61,7 +61,7 @@ public class EntityManager {
                     field.setAccessible(true);
                     try {
                         if (connection != null && !connection.isClosed()) {
-                            field.set(entityManager, connection);
+                            field.set(entityManager, connection.getConnection());
                         }
                     } catch (IllegalArgumentException | IllegalAccessException | SQLException ex) {
                         Logger.getLogger(EntityManager.class.getName()).log(Level.SEVERE, null, ex);
@@ -102,11 +102,11 @@ public class EntityManager {
             T entityManager = (T) instance.newInstance();
             Field[] fields = entityManager.getClass().getDeclaredFields();
             for (Field field : fields) {
-                if (field.isAnnotationPresent(InjectConnection.class) && field.getType().isAssignableFrom(connection.getClass())) {
+                if (field.isAnnotationPresent(InjectConnection.class) && field.getType().isAssignableFrom(Connection.class)) {
                     field.setAccessible(true);
                     try {
                         if (connection != null && !connection.isClosed()) {
-                            field.set(entityManager, connection);
+                            field.set(entityManager, connection.getConnection());
                         }
                     } catch (IllegalArgumentException | IllegalAccessException | SQLException ex) {
                         Logger.getLogger(EntityManager.class.getName()).log(Level.SEVERE, null, ex);
@@ -134,7 +134,7 @@ public class EntityManager {
             T entityManager = (T) instance.newInstance();
             Field[] fields = entityManager.getClass().getDeclaredFields();
             for (Field field : fields) {
-                if (field.isAnnotationPresent(InjectConnection.class) && field.getType().isAssignableFrom(connection.getClass())) {
+                if (field.isAnnotationPresent(InjectConnection.class) && field.getType().isAssignableFrom(Connection.class)) {
                     field.setAccessible(true);
                     try {
                         if (connection != null && !connection.isClosed()) {

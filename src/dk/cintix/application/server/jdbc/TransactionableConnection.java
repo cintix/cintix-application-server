@@ -2,6 +2,7 @@ package dk.cintix.application.server.jdbc;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 /**
  *
@@ -58,19 +59,26 @@ public class TransactionableConnection implements AutoCloseable {
         if (transactionType == TransactionType.AUTOCOMMIT) {
             return;
         }
-        connection.createStatement().execute("ROLLBACK;");
-        close();
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("ROLLBACK;");
+        }
+        transactionType = TransactionType.AUTOCOMMIT;
+        connection.close();
     }
 
     public void beginTransaction() throws SQLException {
         transactionType = TransactionType.TRANSACTION;
-        connection.createStatement().execute("begin transaction;");
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("begin transaction;");
+        }
     }
 
     public void commit() throws SQLException {
-        transactionType = TransactionType.AUTOCOMMIT;
         try {
-            connection.createStatement().execute("COMMIT;");
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("COMMIT;");
+            }
+            transactionType = TransactionType.AUTOCOMMIT;
         } catch (SQLException sQLException) {
             inErrorState = true;
             throw sQLException;
@@ -80,7 +88,9 @@ public class TransactionableConnection implements AutoCloseable {
     public void generateSavepoint() throws SQLException {
         savepointer++;
         try {
-            connection.createStatement().execute("SAVEPOINT SAVE_POINT_" + savepointer + ";");
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("SAVEPOINT SAVE_POINT_" + savepointer + ";");
+            }
         } catch (SQLException sQLException) {
             inErrorState = true;
             throw sQLException;
@@ -91,7 +101,9 @@ public class TransactionableConnection implements AutoCloseable {
     
     public void rollbackToLastSavepoint() throws SQLException {
         try {
-            connection.createStatement().execute("ROLLBACK TO SAVE_POINT_" + savepointer + ";");
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("ROLLBACK TO SAVE_POINT_" + savepointer + ";");
+            }
         } catch (SQLException sQLException) {
             inErrorState = true;
             throw sQLException;
@@ -100,7 +112,9 @@ public class TransactionableConnection implements AutoCloseable {
 
     public void generateCustomSavepoint(String name) throws SQLException {
         try {
-            connection.createStatement().execute("SAVEPOINT SAVE_POINT_" + name + ";");
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("SAVEPOINT SAVE_POINT_" + name + ";");
+            }
         } catch (SQLException sQLException) {
             inErrorState = true;
             throw sQLException;
@@ -111,7 +125,9 @@ public class TransactionableConnection implements AutoCloseable {
     
     public void rollbackToCustomSavepoint(String name) throws SQLException {
         try {
-            connection.createStatement().execute("ROLLBACK TO SAVE_POINT_" + name + ";");
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("ROLLBACK TO SAVE_POINT_" + name + ";");
+            }
         } catch (SQLException sQLException) {
             inErrorState = true;
             throw sQLException;

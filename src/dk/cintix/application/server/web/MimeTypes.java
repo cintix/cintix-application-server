@@ -108,6 +108,9 @@ public class MimeTypes {
      * @return 
      */
     public static String ContentType(String ext) {
+        if (ext == null) {
+            return "application/octet-stream";
+        }
         if (_LOCAL_MAP.containsKey(ext.toLowerCase())) {
             return _LOCAL_MAP.get(ext.toLowerCase());
         }

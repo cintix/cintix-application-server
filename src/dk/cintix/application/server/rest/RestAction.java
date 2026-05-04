@@ -71,20 +71,10 @@ public class RestAction {
             Object[] methodArguments = new Object[parameterTypes.length];
 
             String cacheBaseId = baseId(method.toString());
-            String requestId = baseId(Arrays.toString(methodArguments));
 
             CacheType cacheType = getCacheStategy(method);
             boolean useCache = (cacheType != CacheType.NONE);
             dk.cintix.application.server.io.cache.Cache cache = _CACHE_MAPS.get(cacheBaseId);
-
-            if (useCache && cache != null) {
-                if (cache.contains(requestId)) {
-                    CachedResponse response = new CachedResponse(cache.get(requestId).toString().getBytes());
-                    if (response != null) {
-                        return response;
-                    }
-                }
-            }
 
             String accept = method.getAnnotation(Action.class).consume();
 
@@ -106,6 +96,15 @@ public class RestAction {
                     Parameter parameter = parameterTypes[index];
                     String value = arguments.get(index);
                     methodArguments[index] = valueFromType(parameter, value);
+                }
+            }
+            String requestId = baseId(Arrays.toString(methodArguments));
+            if (useCache && cache != null) {
+                if (cache.contains(requestId)) {
+                    CachedResponse response = new CachedResponse(cache.get(requestId).toString().getBytes());
+                    if (response != null) {
+                        return response;
+                    }
                 }
             }
 

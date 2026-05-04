@@ -87,12 +87,11 @@ public class Cache<K, T> {
      */
     @SuppressWarnings("unchecked")
     public T get(K key) {
+        cleanup();
         CacheObject c;
         synchronized (cacheMap) {
             c = (CacheObject) cacheMap.get(key);
         }
-
-        cleanup();
         if (c == null) {
             return null;
         } else {

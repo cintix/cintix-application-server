@@ -31,6 +31,9 @@ public class SSLContextManager {
             SSLCertificateManager certificateManager = new SSLCertificateManager();
 
             KeyStore keyStore = certificateManager.loadKeystore(key);
+            if (keyStore == null) {
+                return null;
+            }
 
             KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
 

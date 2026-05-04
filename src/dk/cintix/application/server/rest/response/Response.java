@@ -178,7 +178,7 @@ public class Response {
             try {
                 Map<String, String> properties = new TreeMap<>();
                 properties.putAll(request.getPostParams());
-                properties.putAll(request.getPostParams());
+                properties.putAll(request.getQueryStrings());
                 properties.putAll(variables);
                 Map<String, Object> resources = new TreeMap<>();
                 resources.put(RestHttpRequest.class.getName(), request);                

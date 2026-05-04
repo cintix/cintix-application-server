@@ -3,12 +3,14 @@
 package dk.cintix.application.server.rest;
 
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  *
  * @author cix
  */
 public class RestClient {
+    private static final AtomicLong SEQUENCE = new AtomicLong(0);
 
     private String localAddress;
     private String remoteAddress;
@@ -19,7 +21,7 @@ public class RestClient {
         localAddress = sc.getLocalAddress().toString();
         remoteAddress = sc.getRemoteAddress().toString();
         created = System.currentTimeMillis();
-        sessionId = "SS-" + created;
+        sessionId = "SS-" + created + "-" + SEQUENCE.incrementAndGet();
     }
 
     public String getLocalAddress() {

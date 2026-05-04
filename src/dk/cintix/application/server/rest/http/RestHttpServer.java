@@ -75,7 +75,7 @@ public abstract class RestHttpServer {
 
     public String getDocumentRoot() {
         while (documentRoot.trim().endsWith("/")) {
-            documentRoot = documentRoot.trim().substring(0, -1);
+            documentRoot = documentRoot.trim().substring(0, documentRoot.trim().length() - 1);
         }
         return documentRoot;
     }
@@ -95,7 +95,7 @@ public abstract class RestHttpServer {
         this.documentRoot = documentRoot;
         if (documentRoot != null && !documentRoot.isEmpty()) {
             while (documentRoot.trim().endsWith("/")) {
-                documentRoot = documentRoot.trim().substring(0, -1);
+                documentRoot = documentRoot.trim().substring(0, documentRoot.trim().length() - 1);
             }
         }
         Application.set("DOCUMENT_ROOT", getDocumentRoot());
@@ -278,7 +278,7 @@ public abstract class RestHttpServer {
         int totalRead = 0;
         int MAX_BYTES = 1024 * 1024 * 5; // 5MB       
 
-        if (client.socket() == null && client.socket().getInputStream() == null && client.socket().getInputStream().available() < 1) {
+        if (client.socket() == null || client.socket().getInputStream() == null || client.socket().getInputStream().available() < 1) {
             return;
         }
 
@@ -329,12 +329,15 @@ public abstract class RestHttpServer {
         System.out.println("----------------------------------------------------------------------------\n");
          */
         int indexOfFormdata = headerData.indexOf("\r\n\r\n");
-        String rawPost = headerData.substring(indexOfFormdata + 4);
+        String rawPost = "";
+        if (indexOfFormdata != -1 && headerData.length() >= indexOfFormdata + 4) {
+            rawPost = headerData.substring(indexOfFormdata + 4);
+        }
 
         if (indexOfFormdata == -1) {
             indexOfFormdata = headerData.indexOf("\n\n");
-            if (indexOfFormdata != -1) {
-                rawPost = headerData.substring(indexOfFormdata + 4);
+            if (indexOfFormdata != -1 && headerData.length() >= indexOfFormdata + 2) {
+                rawPost = headerData.substring(indexOfFormdata + 2);
             }
         }
 
@@ -359,7 +362,7 @@ public abstract class RestHttpServer {
         RestHttpRequest httpRequest = new RestHttpRequest(headers, queryStrings, postFields, inputStream, method, contextPath, rawPost);
         requestEvent(restClient, httpRequest);
         String subdomain = headers.get("HOST");
-        if (subdomain.contains(".")) {
+        if (subdomain != null && subdomain.contains(".")) {
             subdomain = subdomain.substring(0, subdomain.indexOf("."));
             httpRequest.addHeader("SUBDOMAIN", subdomain);
         }
@@ -380,7 +383,7 @@ public abstract class RestHttpServer {
 
     private Response handleRequestMapping(Map<String, Map<String, RestEndpoint>> pathMapping, RestHttpRequest request) throws Exception {
         String contextPath = request.getContextPath();
-        if ((contextPath.trim().toLowerCase().equals("") || contextPath.trim().toCharArray().equals("/")) && request.getQueryStrings().containsKey("jsd")) {
+        if ((contextPath.trim().equals("") || contextPath.trim().equals("/")) && request.getQueryStrings().containsKey("jsd")) {
             API api = new API();
             for (Service service : documentationEndpoint.values()) {
                 api.addService(service);
@@ -407,7 +410,7 @@ public abstract class RestHttpServer {
 //                System.out.println("=============== " + documentFile + " ====================");              
                 Map<String, String> properties = new TreeMap<>();
                 properties.putAll(request.getPostParams());
-                properties.putAll(request.getPostParams());
+                properties.putAll(request.getQueryStrings());
 
                 Map<String, Object> resources = new TreeMap<>();
                 resources.put(RestHttpRequest.class.getName(), request);

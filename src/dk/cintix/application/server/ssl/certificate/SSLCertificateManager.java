@@ -2,11 +2,7 @@ package dk.cintix.application.server.ssl.certificate;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.security.KeyStore;
-import java.security.PrivateKey;
-import java.security.cert.X509Certificate;
-import java.util.Date;
 
 /**
  *
@@ -37,9 +33,9 @@ public class SSLCertificateManager {
     }
 
     public KeyStore loadKeystore(String key) {
-        try {
+        try (FileInputStream inputStream = new FileInputStream(".keystore")) {
             keyStore = KeyStore.getInstance("JKS");
-            keyStore.load(new FileInputStream(".keystore"), key.toCharArray());
+            keyStore.load(inputStream, key.toCharArray());
             return keyStore;
         } catch (Exception e) {
             e.printStackTrace();

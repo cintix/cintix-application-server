@@ -35,7 +35,11 @@ public class PooledDataSource implements javax.sql.DataSource {
         this.user = user;
         this.password = password;
         this.INITIAL_POOL_SIZE = INITIAL_POOL_SIZE;
-        this.connectionPool = new ArrayList<>(INITIAL_POOL_SIZE);
+        synchronized (PooledDataSource.class) {
+            if (connectionPool == null) {
+                connectionPool = new ArrayList<>(INITIAL_POOL_SIZE);
+            }
+        }
         executorService = Executors.newFixedThreadPool(executorPoolSize);
         try {
 
@@ -96,60 +100,76 @@ public class PooledDataSource implements javax.sql.DataSource {
     }
 
     public boolean releaseConnection(Connection connection) {
-        connectionPool.add(connection);
-        return usedConnections.remove(connection);
+        if (connection == null) {
+            return false;
+        }
+        synchronized (PooledDataSource.class) {
+            boolean removed = usedConnections.remove(connection);
+            if (!removed) {
+                return false;
+            }
+            connectionPool.add(connection);
+            return true;
+        }
     }
 
     private Connection createConnection(String url, String user, String password) throws SQLException {
         Connection connection = DriverManager.getConnection(url, user, password);
 //        connection.setNetworkTimeout(executorService, timeout);
-        connectionPool.add(connection);
+        synchronized (PooledDataSource.class) {
+            connectionPool.add(connection);
+        }
         return connection;
     }
 
     private void validatePool() throws SQLException {
         List<Connection> deadConnections = new ArrayList<>();
-        for (int index = 0; index < usedConnections.size(); index++) {
-            Connection connection = usedConnections.get(index);
-            if (connection.isClosed() || !connection.isValid(validSocketTimeOut)) {
-                deadConnections.add(connection);
-                connection.close();
-                connection = null;
-                createConnection(url, user, password);
+        synchronized (PooledDataSource.class) {
+            for (int index = 0; index < usedConnections.size(); index++) {
+                Connection connection = usedConnections.get(index);
+                if (connection.isClosed() || !connection.isValid(validSocketTimeOut)) {
+                    deadConnections.add(connection);
+                    connection.close();
+                    createConnection(url, user, password);
+                }
+            }
+
+            for (int index = 0; index < deadConnections.size(); index++) {
+                usedConnections.remove(deadConnections.get(index));
             }
         }
-
-        for (int index = 0; index < deadConnections.size(); index++) {
-            usedConnections.remove(deadConnections.get(index));
-        }
-
-        deadConnections.clear();
-        deadConnections = null;
     }
 
     public int getSize() {
-        return connectionPool.size() + usedConnections.size();
+        synchronized (PooledDataSource.class) {
+            return connectionPool.size() + usedConnections.size();
+        }
     }
 
     @Override
     public Connection getConnection() throws SQLException {
         validatePool();
-        
-        if (connectionPool.size() == 0) {
-            throw new SQLException("Could not get a new connetion from the connection pool!");
+        synchronized (PooledDataSource.class) {
+            if (connectionPool.size() == 0) {
+                throw new SQLException("Could not get a new connetion from the connection pool!");
+            }
+            Connection connection = connectionPool.remove(connectionPool.size() - 1);
+            usedConnections.add(connection);
+            return connection;
         }
-        
-        Connection connection = connectionPool.remove(connectionPool.size() - 1);
-        usedConnections.add(connection);
-        return connection;
     }
 
     @Override
     public Connection getConnection(String string, String string1) throws SQLException {
         validatePool();
-        Connection connection = connectionPool.remove(connectionPool.size() - 1);
-        usedConnections.add(connection);
-        return connection;
+        synchronized (PooledDataSource.class) {
+            if (connectionPool.size() == 0) {
+                throw new SQLException("Could not get a new connetion from the connection pool!");
+            }
+            Connection connection = connectionPool.remove(connectionPool.size() - 1);
+            usedConnections.add(connection);
+            return connection;
+        }
     }
 
     @Override

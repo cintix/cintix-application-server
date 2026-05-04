@@ -15,17 +15,18 @@ public class HttpUtil {
 
     public static void parsePostFields(int linesProcessed, String[] requestLines, final Map<String, String> postFields) {
         if (linesProcessed < (requestLines.length)) {            
-            String rawRequest = "";
-            for (int index = linesProcessed; index < requestLines.length-1; index++) {
-                rawRequest += requestLines[index];
+            StringBuilder rawRequest = new StringBuilder();
+            for (int index = linesProcessed; index < requestLines.length - 1; index++) {
+                rawRequest.append(requestLines[index]);
             }
 
-            postFields.put("!RAW", rawRequest);
+            postFields.put("!RAW", rawRequest.toString());
             String[] postParams = requestLines[linesProcessed++].split("&");
             for (int index = 0; index < postParams.length; index++) {
                 if (postParams[index].contains("=")) {
-                    String[] keyValue = postParams[index].split("=");
-                    postFields.put(keyValue[0], (keyValue[1] != null) ? keyValue[1].trim() : "");
+                    String[] keyValue = postParams[index].split("=", 2);
+                    String value = (keyValue.length > 1 && keyValue[1] != null) ? keyValue[1].trim() : "";
+                    postFields.put(keyValue[0], value);
                 }
             }
         }
@@ -38,8 +39,9 @@ public class HttpUtil {
             String[] queryStrins = queryStringLine.split("&");
             for (int index = 0; index < queryStrins.length; index++) {
                 if (queryStrins[index].contains("=")) {
-                    String[] keyValue = queryStrins[index].split("=");
-                    queryStrings.put(keyValue[0], (keyValue[1] != null) ? keyValue[1].trim() : "");
+                    String[] keyValue = queryStrins[index].split("=", 2);
+                    String value = (keyValue.length > 1 && keyValue[1] != null) ? keyValue[1].trim() : "";
+                    queryStrings.put(keyValue[0], value);
                 } else {
                     queryStrings.put(queryStrins[index], "");
                 }
@@ -58,8 +60,9 @@ public class HttpUtil {
                 linesProcessed++;
                 break;
             }
-            String[] keyValue = requestLines[index].split(":");
-            headers.put(keyValue[0].toUpperCase().trim(), (keyValue[1] != null) ? keyValue[1].trim() : "");
+            String[] keyValue = requestLines[index].split(":", 2);
+            String value = (keyValue.length > 1 && keyValue[1] != null) ? keyValue[1].trim() : "";
+            headers.put(keyValue[0].toUpperCase().trim(), value);
             linesProcessed++;
         }
         linesProcessed++;
@@ -71,15 +74,15 @@ public class HttpUtil {
             return "";
         }
 
-        String path = "";
+        StringBuilder path = new StringBuilder();
         for (int index = 0; index < oldPath.length - 1; index++) {
-            path += oldPath[index] + "/";
+            path.append(oldPath[index]).append("/");
         }
 
-        if (path != "") {
-            path = path.substring(0, -1);
+        if (path.length() > 0) {
+            path.setLength(path.length() - 1);
         }
-        return path;
+        return path.toString();
     }
 
     public static boolean contentTypeMatch(String accept, String contentType) {

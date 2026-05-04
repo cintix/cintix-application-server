@@ -49,7 +49,7 @@ public class Application {
      */
     public static File getConfigFolder() {
         File configFolder = new File(getPath() + "/conf");
-        if (!configFolder.exists() || configFolder.isDirectory()) {
+        if (!configFolder.exists() || !configFolder.isDirectory()) {
             configFolder.mkdir();
         }
         return configFolder;
@@ -61,7 +61,7 @@ public class Application {
      */
     public static File getCacheFolder() {
         File cacheFolder = new File(getPath() + "/cache");
-        if (!cacheFolder.exists() || cacheFolder.isDirectory()) {
+        if (!cacheFolder.exists() || !cacheFolder.isDirectory()) {
             cacheFolder.mkdir();
         }
         return cacheFolder;
