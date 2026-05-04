@@ -44,6 +44,10 @@ public class TransactionableConnection implements AutoCloseable {
     @Override
     public void close() throws SQLException {
         if (transactionType == TransactionType.TRANSACTION) {
+            if (inErrorState) {
+                rollback();
+                inErrorState = false;
+            }
             return;
         }
 

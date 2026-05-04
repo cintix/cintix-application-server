@@ -35,7 +35,7 @@ public class EntityManager {
         if (entityManager != null) {
             Field[] fields = entityManager.getClass().getDeclaredFields();
             for (Field field : fields) {
-                if (field.isAnnotationPresent(InjectConnection.class) && field.getType().isAssignableFrom(Connection.class)) {
+                if (field.isAnnotationPresent(InjectConnection.class) && Connection.class.isAssignableFrom(field.getType())) {
                     field.setAccessible(true);
                     try {
                         if (connection != null && !connection.isClosed()) {
@@ -57,7 +57,7 @@ public class EntityManager {
         if (entityManager != null) {
             Field[] fields = entityManager.getClass().getDeclaredFields();
             for (Field field : fields) {
-                if (field.isAnnotationPresent(InjectConnection.class) && field.getType().isAssignableFrom(Connection.class)) {
+                if (field.isAnnotationPresent(InjectConnection.class) && Connection.class.isAssignableFrom(field.getType())) {
                     field.setAccessible(true);
                     try {
                         if (connection != null && !connection.isClosed()) {
@@ -102,7 +102,7 @@ public class EntityManager {
             T entityManager = (T) instance.newInstance();
             Field[] fields = entityManager.getClass().getDeclaredFields();
             for (Field field : fields) {
-                if (field.isAnnotationPresent(InjectConnection.class) && field.getType().isAssignableFrom(Connection.class)) {
+                if (field.isAnnotationPresent(InjectConnection.class) && Connection.class.isAssignableFrom(field.getType())) {
                     field.setAccessible(true);
                     try {
                         if (connection != null && !connection.isClosed()) {
@@ -134,7 +134,7 @@ public class EntityManager {
             T entityManager = (T) instance.newInstance();
             Field[] fields = entityManager.getClass().getDeclaredFields();
             for (Field field : fields) {
-                if (field.isAnnotationPresent(InjectConnection.class) && field.getType().isAssignableFrom(Connection.class)) {
+                if (field.isAnnotationPresent(InjectConnection.class) && Connection.class.isAssignableFrom(field.getType())) {
                     field.setAccessible(true);
                     try {
                         if (connection != null && !connection.isClosed()) {

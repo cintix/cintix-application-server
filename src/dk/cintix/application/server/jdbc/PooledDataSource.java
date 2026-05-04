@@ -17,29 +17,25 @@ import java.util.logging.Logger;
  */
 public class PooledDataSource implements javax.sql.DataSource {
 
-    private static String url;
-    private static String user;
-    private static String password;
+    private final String url;
+    private final String user;
+    private final String password;
 
-    private static int INITIAL_POOL_SIZE;
+    private final int INITIAL_POOL_SIZE;
     private static int timeout = 30000;
     private static int executorPoolSize = 5;
     private static int validSocketTimeOut = 25;
 
     private static ExecutorService executorService;
-    private static List<Connection> connectionPool;
-    private static final List<Connection> usedConnections = new ArrayList<>();
+    private final List<Connection> connectionPool;
+    private final List<Connection> usedConnections = new ArrayList<>();
 
     public PooledDataSource(String url, String user, String password, int INITIAL_POOL_SIZE) {
         this.url = url;
         this.user = user;
         this.password = password;
         this.INITIAL_POOL_SIZE = INITIAL_POOL_SIZE;
-        synchronized (PooledDataSource.class) {
-            if (connectionPool == null) {
-                connectionPool = new ArrayList<>(INITIAL_POOL_SIZE);
-            }
-        }
+        this.connectionPool = new ArrayList<>(INITIAL_POOL_SIZE);
         executorService = Executors.newFixedThreadPool(executorPoolSize);
         try {
 
@@ -103,7 +99,7 @@ public class PooledDataSource implements javax.sql.DataSource {
         if (connection == null) {
             return false;
         }
-        synchronized (PooledDataSource.class) {
+        synchronized (this) {
             boolean removed = usedConnections.remove(connection);
             if (!removed) {
                 return false;
@@ -116,7 +112,7 @@ public class PooledDataSource implements javax.sql.DataSource {
     private Connection createConnection(String url, String user, String password) throws SQLException {
         Connection connection = DriverManager.getConnection(url, user, password);
 //        connection.setNetworkTimeout(executorService, timeout);
-        synchronized (PooledDataSource.class) {
+        synchronized (this) {
             connectionPool.add(connection);
         }
         return connection;
@@ -124,7 +120,7 @@ public class PooledDataSource implements javax.sql.DataSource {
 
     private void validatePool() throws SQLException {
         List<Connection> deadConnections = new ArrayList<>();
-        synchronized (PooledDataSource.class) {
+        synchronized (this) {
             for (int index = 0; index < usedConnections.size(); index++) {
                 Connection connection = usedConnections.get(index);
                 if (connection.isClosed() || !connection.isValid(validSocketTimeOut)) {
@@ -137,11 +133,24 @@ public class PooledDataSource implements javax.sql.DataSource {
             for (int index = 0; index < deadConnections.size(); index++) {
                 usedConnections.remove(deadConnections.get(index));
             }
+
+            deadConnections.clear();
+            for (int index = 0; index < connectionPool.size(); index++) {
+                Connection connection = connectionPool.get(index);
+                if (connection.isClosed() || !connection.isValid(validSocketTimeOut)) {
+                    deadConnections.add(connection);
+                    connection.close();
+                    createConnection(url, user, password);
+                }
+            }
+            for (int index = 0; index < deadConnections.size(); index++) {
+                connectionPool.remove(deadConnections.get(index));
+            }
         }
     }
 
     public int getSize() {
-        synchronized (PooledDataSource.class) {
+        synchronized (this) {
             return connectionPool.size() + usedConnections.size();
         }
     }
@@ -149,7 +158,7 @@ public class PooledDataSource implements javax.sql.DataSource {
     @Override
     public Connection getConnection() throws SQLException {
         validatePool();
-        synchronized (PooledDataSource.class) {
+        synchronized (this) {
             if (connectionPool.size() == 0) {
                 throw new SQLException("Could not get a new connetion from the connection pool!");
             }
@@ -162,7 +171,7 @@ public class PooledDataSource implements javax.sql.DataSource {
     @Override
     public Connection getConnection(String string, String string1) throws SQLException {
         validatePool();
-        synchronized (PooledDataSource.class) {
+        synchronized (this) {
             if (connectionPool.size() == 0) {
                 throw new SQLException("Could not get a new connetion from the connection pool!");
             }
