@@ -7,9 +7,20 @@
 <!-- the Compile on Save feature is turned off for the project. -->
 <!-- You can turn off the Compile on Save (or Deploy on Save) setting -->
 <!-- in the project's Project Properties dialog box.-->
-<project name="cintix-application-server" default="jar" basedir=".">
+<project name="cintix-application-server" default="jar-with-dependencies" basedir=".">
     <description>Builds, tests, and runs the project cintix-application-server.</description>
     <import file="nbproject/build-impl.xml"/>
+    
+    <target name="jar-with-dependencies" depends="jar" description="Builds a jar that includes gson classes.">
+        <property name="dist.all.jar" value="${dist.dir}/cintix-application-server-all.jar"/>
+        <copy file="${dist.jar}" tofile="${dist.all.jar}" overwrite="true"/>
+        <jar destfile="${dist.all.jar}" update="true">
+            <zipgroupfileset
+                dir="${basedir}/lib"
+                includes="gson-2.8.6.jar"
+                excludes="META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA"/>
+        </jar>
+    </target>
     <!--
 
     There exist several targets which are by default empty and which can be 
