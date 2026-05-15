@@ -1,6 +1,7 @@
 package dk.cintix.application.server.jdbc;
 
 import dk.cintix.application.server.TestSupport;
+import dk.cintix.application.server.modules.database.services.TransactionableConnection;
 
 public class TransactionableConnectionTest {
 

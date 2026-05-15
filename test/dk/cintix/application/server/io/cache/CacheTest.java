@@ -1,6 +1,8 @@
 package dk.cintix.application.server.io.cache;
 
 import dk.cintix.application.server.TestSupport;
+import dk.cintix.application.server.infrastructure.Cache;
+import dk.cintix.application.server.infrastructure.CacheType;
 import java.util.List;
 
 public class CacheTest {

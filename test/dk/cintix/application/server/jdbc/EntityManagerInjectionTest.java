@@ -1,8 +1,10 @@
 package dk.cintix.application.server.jdbc;
 
 import dk.cintix.application.server.TestSupport;
-import dk.cintix.application.server.jdbc.annotations.Entity;
-import dk.cintix.application.server.jdbc.annotations.InjectConnection;
+import dk.cintix.application.server.modules.database.annotations.Entity;
+import dk.cintix.application.server.modules.database.annotations.InjectConnection;
+import dk.cintix.application.server.modules.database.services.EntityManager;
+import dk.cintix.application.server.modules.database.services.TransactionableConnection;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 

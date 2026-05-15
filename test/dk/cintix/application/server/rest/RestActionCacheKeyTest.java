@@ -1,10 +1,12 @@
 package dk.cintix.application.server.rest;
 
 import dk.cintix.application.server.TestSupport;
-import dk.cintix.application.server.rest.annotations.Action;
-import dk.cintix.application.server.rest.annotations.Cache;
-import dk.cintix.application.server.rest.http.request.RestHttpRequest;
-import dk.cintix.application.server.rest.response.Response;
+import dk.cintix.application.server.infrastructure.annotations.Action;
+import dk.cintix.application.server.infrastructure.annotations.Cache;
+import dk.cintix.application.server.modules.http.server.endpoint.RestHttpRequest;
+import dk.cintix.application.server.modules.http.server.services.RestActionService;
+import dk.cintix.application.server.modules.http.server.services.domain.models.Response;
+import dk.cintix.application.server.modules.http.server.services.domain.models.RestEndpoint;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -24,8 +26,8 @@ public class RestActionCacheKeyTest {
         RestHttpRequest request = new RestHttpRequest(new LinkedHashMap<String, String>(), new LinkedHashMap<String, String>(), new LinkedHashMap<String, String>(), null, "GET", "/echo/a", "");
 
         // Act
-        Response first = new RestAction(endpoint, Arrays.asList("A")).process(request);
-        Response second = new RestAction(endpoint, Arrays.asList("B")).process(request);
+        Response first = new RestActionService(endpoint, Arrays.asList("A")).process(request);
+        Response second = new RestActionService(endpoint, Arrays.asList("B")).process(request);
 
         // Assert
         String firstBody = bodyFromResponse(first);

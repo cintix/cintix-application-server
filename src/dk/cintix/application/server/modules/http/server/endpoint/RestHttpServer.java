@@ -1,0 +1,584 @@
+package dk.cintix.application.server.modules.http.server.endpoint;
+
+import dk.cintix.application.server.infrastructure.Application;
+import dk.cintix.application.server.infrastructure.ReflectionUtil;
+import dk.cintix.application.server.infrastructure.annotations.Action;
+import dk.cintix.application.server.infrastructure.annotations.DELETE;
+import dk.cintix.application.server.infrastructure.annotations.POST;
+import dk.cintix.application.server.infrastructure.annotations.PUT;
+import dk.cintix.application.server.infrastructure.annotations.OnBinary;
+import dk.cintix.application.server.infrastructure.annotations.OnClose;
+import dk.cintix.application.server.infrastructure.annotations.OnError;
+import dk.cintix.application.server.infrastructure.annotations.OnMessage;
+import dk.cintix.application.server.infrastructure.annotations.OnOpen;
+import dk.cintix.application.server.infrastructure.annotations.WebSocket;
+import dk.cintix.application.server.modules.http.server.HttpModule;
+import dk.cintix.application.server.modules.http.server.services.JsonServiceDescriptionEngine;
+import dk.cintix.application.server.modules.http.server.services.WebSocketService;
+import dk.cintix.application.server.modules.http.server.services.jsd.models.API;
+import dk.cintix.application.server.modules.http.server.services.jsd.models.Service;
+import dk.cintix.application.server.modules.http.server.endpoint.events.HttpConnectionEvents;
+import dk.cintix.application.server.modules.http.server.endpoint.events.HttpNotificationEvents;
+import dk.cintix.application.server.modules.http.server.endpoint.events.HttpRequestEvents;
+import dk.cintix.application.server.modules.http.server.services.RestActionService;
+import dk.cintix.application.server.modules.http.server.services.domain.models.Response;
+import dk.cintix.application.server.modules.http.server.services.domain.models.RestClient;
+import dk.cintix.application.server.modules.http.server.services.domain.models.RestEndpoint;
+import dk.cintix.html.engine.HTMLEngine;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.nio.file.Files;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ *
+ * @author cix
+ */
+public abstract class RestHttpServer implements HttpModule {
+
+    private static final Map<String, Map<String, RestEndpoint>> pathMapping = new LinkedHashMap<>();
+    private final Map<String, RestClient> clientSessions = new LinkedHashMap<>();
+    private final Map<String, Service> documentationEndpoint = new LinkedHashMap<>();
+    private final WebSocketService webSocketService = new WebSocketService();
+
+    private HttpConnectionEvents connectionEvents;
+    private HttpRequestEvents requestEvents;
+    private HttpNotificationEvents notificationEvents;
+    private InetSocketAddress address;
+    private Selector selector = null;
+    private ServerSocketChannel serverSocketChannel;
+    private ServerSocket serverSocket;
+    private volatile boolean running = true;
+    private final ByteBuffer dataBuffer = ByteBuffer.allocate(2048);
+    private String documentRoot = "web";
+
+    static {
+        Application.set("DOCUMENT_ROOT", null);
+    }
+
+    @Override
+    public String getDocumentRoot() {
+        while (documentRoot.trim().endsWith("/")) {
+            documentRoot = documentRoot.trim().substring(0, documentRoot.trim().length() - 1);
+        }
+        return documentRoot;
+    }
+
+    @Override
+    public void setTagsNamespace(String name) {
+        HTMLEngine.setNamespace(name);
+    }
+
+    @Override
+    public void addTagClass(String name, Class<?> cls) {
+        try {
+            HTMLEngine.addClass(name, cls);
+        } catch (IOException iOException) {
+        }
+    }
+
+    @Override
+    public void setDocumentRoot(String documentRoot) {
+        this.documentRoot = documentRoot;
+        if (documentRoot != null && !documentRoot.isEmpty()) {
+            while (documentRoot.trim().endsWith("/")) {
+                documentRoot = documentRoot.trim().substring(0, documentRoot.trim().length() - 1);
+            }
+        }
+        Application.set("DOCUMENT_ROOT", getDocumentRoot());
+    }
+
+    public RestHttpServer() {
+        if (!pathMapping.containsKey("get")) {
+            pathMapping.put("get", new LinkedHashMap<>());
+        }
+        if (!pathMapping.containsKey("put")) {
+            pathMapping.put("put", new LinkedHashMap<>());
+        }
+        if (!pathMapping.containsKey("post")) {
+            pathMapping.put("post", new LinkedHashMap<>());
+        }
+        if (!pathMapping.containsKey("delete")) {
+            pathMapping.put("delete", new LinkedHashMap<>());
+        }
+    }
+
+    @Override
+    public boolean isRunning() {
+        return running;
+    }
+
+    @Override
+    public void setRunning(boolean running) {
+        this.running = running;
+    }
+
+    @Override
+    public void bind(InetSocketAddress address) throws Exception {
+        bind(address, 50);
+    }
+
+    @Override
+    public void bind(InetSocketAddress address, int backlog) throws Exception {
+        this.address = address;
+        selector = Selector.open();
+        serverSocketChannel = ServerSocketChannel.open();
+        serverSocket = serverSocketChannel.socket();
+        serverSocket.bind(address, backlog);
+    }
+
+    @Override
+    public void addEndpoint(String path, Object endpoint) {
+        documentationEndpoint.put(path + "?jsd", JsonServiceDescriptionEngine.generateServiceDefination(path, null, endpoint));
+        registerEndpoint(pathMapping, path, endpoint);
+    }
+
+    @Override
+    public void addWebSocket(String path, Object handler) {
+        registerWebSocketEndpoint(webSocketService, path, handler);
+    }
+
+    public WebSocketService getWebSocketService() {
+        return webSocketService;
+    }
+
+    private void registerWebSocketEndpoint(WebSocketService service, String path, Object endpoint) {
+        String wsPath = path;
+        if (!wsPath.startsWith("/")) {
+            wsPath = "/" + path;
+        }
+        if (wsPath.endsWith("/") && wsPath.length() > 1) {
+            wsPath = wsPath.substring(0, wsPath.length() - 1);
+        }
+        service.register(wsPath, endpoint);
+    }
+
+    @Override
+    public void connectedEvent(RestClient client) {
+        if (connectionEvents != null) {
+            connectionEvents.connected(client);
+        }
+    }
+
+    @Override
+    public void disconnectedEvent(RestClient client) {
+        if (connectionEvents != null) {
+            connectionEvents.disconnected(client);
+        }
+    }
+
+    @Override
+    public void requestEvent(RestClient client, RestHttpRequest request) {
+        if (requestEvents != null) {
+            requestEvents.request(client, request);
+        }
+    }
+
+    @Override
+    public void notifyEvent(String msg) {
+        if (notificationEvents != null) {
+            notificationEvents.notification(msg);
+        }
+    }
+
+    @Override
+    public void setConnectionEvents(HttpConnectionEvents connectionEvents) {
+        this.connectionEvents = connectionEvents;
+    }
+
+    @Override
+    public void setRequestEvents(HttpRequestEvents requestEvents) {
+        this.requestEvents = requestEvents;
+    }
+
+    @Override
+    public void setNotificationEvents(HttpNotificationEvents notificationEvents) {
+        this.notificationEvents = notificationEvents;
+    }
+
+    @Override
+    public boolean startServer() throws Exception {
+        serverSocketChannel.configureBlocking(false);
+        int validOps = serverSocketChannel.validOps();
+        serverSocketChannel.register(selector, validOps, null);
+        notifyEvent("Server start on " + address.toString());
+        notifyEvent("Listering...");
+
+        while (running) {
+            int amount = selector.select(3000);
+            Set<SelectionKey> selectedKeys = selector.selectedKeys();
+            if (amount > 0)
+            try {
+                SelectionKey key = null;
+                Iterator<SelectionKey> iterator = selectedKeys.iterator();
+                while (iterator.hasNext()) {
+                    key = iterator.next();
+                    iterator.remove();
+
+                    if (!key.isValid()) {
+                        continue;
+                    }
+
+                    if (key.isAcceptable()) {
+                        handleAccept(serverSocketChannel, key);
+                    }
+
+                    if (key.isReadable()) {
+                        handleRead(key);
+                    }
+
+                    if (key.isWritable()) {
+                        handleWrite(key);
+                    }
+                }
+            } catch (Exception exception) {
+            } finally {
+                selectedKeys.clear();
+            }
+            noop();
+        }
+        return running;
+    }
+
+    private void noop() {
+        try {
+            TimeUnit.NANOSECONDS.sleep(50);
+        } catch (InterruptedException ex) {
+        }
+    }
+
+    private void handleDisconnect(SelectionKey key) throws Exception {
+        InternalClientSession clientSession = readAttachment(key);
+
+        if (clientSession.get("ws-mode") != null) {
+            webSocketService.handleDisconnect(clientSession);
+        }
+
+        key.cancel();
+
+        RestClient restClient = clientSessions.get(clientSession.getSessionId());
+        clientSessions.remove(clientSession.getSessionId());
+        disconnectedEvent(restClient);
+    }
+
+    private void handleAccept(ServerSocketChannel mySocket, SelectionKey key) throws Exception {
+        SocketChannel client = mySocket.accept();
+        if (client == null) {
+            return;
+        }
+        RestClient restClient = new RestClient(client);
+        key.attach(restClient.getSessionId());
+
+        clientSessions.put(restClient.getSessionId(), restClient);
+        InternalClientSession clientSession = new InternalClientSession(restClient.getSessionId());
+
+        client.configureBlocking(false);
+
+        client.register(selector, SelectionKey.OP_READ, clientSession);
+        connectedEvent(restClient);
+    }
+
+    private void handleWrite(SelectionKey key) throws Exception {
+        InternalClientSession clientSession = readAttachment(key);
+
+        // WebSocket mode: write queued frames, keep connection open
+        if (clientSession.get("ws-mode") != null) {
+            try (SocketChannel client = (SocketChannel) key.channel()) {
+                webSocketService.handleWrite(clientSession, client);
+            }
+            return;
+        }
+
+        try ( SocketChannel client = (SocketChannel) key.channel()) {
+            Response response = clientSession.getResponse();
+            ByteBuffer buffer = ByteBuffer.wrap(response.build());
+            while (buffer.hasRemaining()) {
+                client.write(buffer);
+            }
+
+            InternalClientSession newSession = new InternalClientSession(clientSession.getSessionId());
+        }
+        handleDisconnect(key);
+    }
+
+    private void handleRead(SelectionKey key) throws Exception {
+        InternalClientSession clientSession = readAttachment(key);
+        SocketChannel client = (SocketChannel) key.channel();
+        RestClient restClient = clientSessions.get(clientSession.getSessionId());
+
+        // WebSocket mode: read raw bytes and dispatch frames
+        if (clientSession.get("ws-mode") != null) {
+            dataBuffer.clear();
+            int read = client.read(dataBuffer);
+            if (read > 0) {
+                dataBuffer.flip();
+                byte[] bytes = new byte[read];
+                dataBuffer.get(bytes);
+                webSocketService.handleFrame(bytes, clientSession, key, client);
+            }
+            return;
+        }
+
+        dataBuffer.clear();
+        String data = "";
+
+        int read;
+        int totalRead = 0;
+        int MAX_BYTES = 1024 * 1024 * 5; // 5MB
+
+        if (client.socket() == null || client.socket().getInputStream() == null || client.socket().getInputStream().available() < 1) {
+            return;
+        }
+
+        while ((read = client.read(dataBuffer)) > 0) {
+            totalRead += read;
+            if (totalRead > MAX_BYTES) {
+                break;
+            }
+
+            dataBuffer.flip();
+            byte[] bytes = new byte[dataBuffer.limit()];
+            dataBuffer.get(bytes);
+            data += new String(bytes);
+            dataBuffer.clear();
+        }
+
+        if (data.length() > 0) {
+            notifyEvent(data);
+            RestHttpRequest request = parseRequest(restClient, client, data);
+
+            // Check for WebSocket upgrade before normal routing
+            if (webSocketService.isWebSocketUpgrade(request)) {
+                webSocketService.handleUpgrade(request, client, key, clientSession);
+                return;
+            }
+
+            Response response = handleRequestMapping(pathMapping, request);
+            InternalClientSession session = new InternalClientSession(clientSession.getSessionId(), response);
+            client.register(selector, SelectionKey.OP_WRITE, session);
+        }
+
+    }
+
+    private InternalClientSession readAttachment(SelectionKey key) throws Exception {
+        if (key.attachment() != null) {
+            return (InternalClientSession) key.attachment();
+        }
+        throw new Exception("Unregistered client read (no session)");
+    }
+
+    private RestHttpRequest parseRequest(RestClient restClient, SocketChannel client, String headerData) throws Exception {
+        final Map<String, String> headers = new LinkedHashMap<>();
+        final Map<String, String> queryStrings = new LinkedHashMap<>();
+        final Map<String, String> postFields = new LinkedHashMap<>();
+        final InputStream inputStream = client.socket().getInputStream();
+
+        String contextPath = "";
+        String method = "GET";
+        String[] requestLines = headerData.split("\n");
+        String[] methodAndPath = requestLines[0].split(" ");
+        int linesProcessed = 0;
+        int indexOfFormdata = headerData.indexOf("\r\n\r\n");
+        String rawPost = "";
+        if (indexOfFormdata != -1 && headerData.length() >= indexOfFormdata + 4) {
+            rawPost = headerData.substring(indexOfFormdata + 4);
+        }
+
+        if (indexOfFormdata == -1) {
+            indexOfFormdata = headerData.indexOf("\n\n");
+            if (indexOfFormdata != -1 && headerData.length() >= indexOfFormdata + 2) {
+                rawPost = headerData.substring(indexOfFormdata + 2);
+            }
+        }
+
+        method = methodAndPath[0].toUpperCase();
+        for (int index = 1; index < methodAndPath.length - 1; index++) {
+            contextPath += methodAndPath[index] + " ";
+        }
+
+        contextPath = contextPath.trim();
+
+        if (!documentationEndpoint.containsKey(contextPath)) {
+            contextPath = HttpUtil.parseQueryStrings(contextPath, queryStrings);
+            contextPath = contextPath.trim();
+        }
+
+        if (contextPath.endsWith("/")) {
+            contextPath = contextPath.substring(0, contextPath.length() - 1);
+        }
+
+        linesProcessed = HttpUtil.parseHeaderKeys(requestLines, headers, linesProcessed);
+        HttpUtil.parsePostFields(linesProcessed, requestLines, postFields);
+        RestHttpRequest httpRequest = new RestHttpRequest(headers, queryStrings, postFields, inputStream, method, contextPath, rawPost);
+        requestEvent(restClient, httpRequest);
+        String subdomain = headers.get("HOST");
+        if (subdomain != null && subdomain.contains(".")) {
+            subdomain = subdomain.substring(0, subdomain.indexOf("."));
+            httpRequest.addHeader("SUBDOMAIN", subdomain);
+        }
+
+        return httpRequest;
+    }
+
+    private boolean isRequestADocument(String context) {
+        File jailedRoot = new File(documentRoot);
+        File checkFile = new File(getDocumentRoot() + context);
+        if (checkFile.exists()) {
+            if (checkFile.getAbsolutePath().startsWith(jailedRoot.getAbsolutePath())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Response handleRequestMapping(Map<String, Map<String, RestEndpoint>> pathMapping, RestHttpRequest request) throws Exception {
+        String contextPath = request.getContextPath();
+        if ((contextPath.trim().equals("") || contextPath.trim().equals("/")) && request.getQueryStrings().containsKey("jsd")) {
+            API api = new API();
+            for (Service service : documentationEndpoint.values()) {
+                api.addService(service);
+            }
+            return new Response().OK().ContentType("application/json").model(api);
+
+        }
+
+        if (documentationEndpoint.containsKey(contextPath)) {
+            return new Response().OK().ContentType("application/json").model(documentationEndpoint.get(contextPath));
+        }
+
+        if (contextPath.equals("")) {
+            contextPath = "/index.htm";
+            if (!isRequestADocument(contextPath)) {
+                contextPath = "/index.html";
+            }
+        }
+
+        if (isRequestADocument(contextPath) && Application.get("DOCUMENT_ROOT") != null) {
+            File documentFile = new File(getDocumentRoot() + contextPath);
+            if (contextPath.toLowerCase().endsWith(".htm") || contextPath.toLowerCase().endsWith(".html")) {
+                Map<String, String> properties = new TreeMap<>();
+                properties.putAll(request.getPostParams());
+                properties.putAll(request.getQueryStrings());
+
+                Map<String, Object> resources = new TreeMap<>();
+                resources.put(RestHttpRequest.class.getName(), request);
+
+                String contentData = HTMLEngine.process(documentFile, properties, resources);
+                return new Response().OK().ContentType("text/html").data(contentData);
+            }
+
+            String fileExt = contextPath.substring(contextPath.lastIndexOf(".") + 1);
+            String contextType = MimeTypes.ContentType(fileExt);
+
+            byte[] fileContent = Files.readAllBytes(documentFile.toPath());
+            return new Response().OK().ContentType(contextType).Content(fileContent);
+        }
+
+        Map<String, RestEndpoint> requestMap = pathMapping.get(request.getMethod().toLowerCase());
+        RestActionService restAction = locateEndpoint(requestMap, contextPath.trim());
+
+        if (restAction != null) {
+            return restAction.process(request);
+        } else {
+            return new Response().NotFound();
+        }
+    }
+
+    private RestActionService locateEndpoint(Map<String, RestEndpoint> mapping, String contextPath) throws Exception {
+        if (mapping.containsKey(contextPath)) {
+            return new RestActionService(mapping.get(contextPath), new LinkedList<>());
+        }
+
+        List<String> regexMApping = new LinkedList<>();
+        regexMApping.addAll(mapping.keySet());
+
+        Collections.sort(regexMApping, Comparator.comparing(String::length));
+        Collections.reverse(regexMApping);
+
+        for (String pattern : regexMApping) {
+
+            if (!pattern.startsWith("^")) {
+                continue;
+            }
+
+            Pattern regex = Pattern.compile(pattern);
+            Matcher matcher = regex.matcher(contextPath);
+            boolean found = false;
+            List<String> arguments = new LinkedList<>();
+
+            while (matcher.find()) {
+                found = true;
+                for (int index = 2; index < matcher.groupCount() + 1; index++) {
+                    arguments.add(matcher.group(index));
+                }
+            }
+            if (found) {
+                return new RestActionService(mapping.get(pattern), arguments);
+            }
+        }
+        return null;
+    }
+
+    private void registerEndpoint(Map<String, Map<String, RestEndpoint>> pathMapping, String path, Object endpoint) {
+        String base = path;
+        Method[] methods = endpoint.getClass().getDeclaredMethods();
+
+        for (Method method : methods) {
+            Method readFrom = ReflectionUtil.getBestDescribedMethod(method, endpoint);
+            String httpMethod = "get";
+
+            if (readFrom.isAnnotationPresent(POST.class)) {
+                httpMethod = "post";
+            }
+            if (readFrom.isAnnotationPresent(PUT.class)) {
+                httpMethod = "put";
+            }
+            if (readFrom.isAnnotationPresent(DELETE.class)) {
+                httpMethod = "delete";
+            }
+
+            Map<String, RestEndpoint> httpMethodMap = pathMapping.get(httpMethod);
+
+            if (readFrom.isAnnotationPresent(Action.class)) {
+                Action action = readFrom.getAnnotation(Action.class);
+                String actionPath = action.path();
+
+                if (!actionPath.startsWith("/")) {
+                    actionPath = "/" + action.path();
+                }
+
+                if (action.path().equals("/")) {
+                    actionPath = "";
+                }
+
+                String urlPattern = HttpUtil.complieRegexFromPath(base + actionPath);
+                httpMethodMap.put(urlPattern, new RestEndpoint(base + actionPath, method, endpoint));
+                httpMethodMap.put(base + actionPath, new RestEndpoint(base + actionPath, method, endpoint));
+                pathMapping.put(httpMethod, httpMethodMap);
+
+            }
+        }
+
+    }
+
+}

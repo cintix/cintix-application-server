@@ -1,6 +1,7 @@
 package dk.cintix.application.server.web;
 
 import dk.cintix.application.server.TestSupport;
+import dk.cintix.application.server.modules.http.server.endpoint.MimeTypes;
 
 public class MimeTypesTest {
 

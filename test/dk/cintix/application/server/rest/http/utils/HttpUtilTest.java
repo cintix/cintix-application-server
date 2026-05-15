@@ -1,6 +1,7 @@
 package dk.cintix.application.server.rest.http.utils;
 
 import dk.cintix.application.server.TestSupport;
+import dk.cintix.application.server.modules.http.server.endpoint.HttpUtil;
 import java.util.LinkedHashMap;
 import java.util.Map;
 

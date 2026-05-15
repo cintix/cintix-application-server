@@ -1,6 +1,7 @@
 package dk.cintix.application.server.io.memory;
 
 import dk.cintix.application.server.TestSupport;
+import dk.cintix.application.server.infrastructure.ByteMemoryStream;
 
 public class ByteMemoryStreamTest {
 
