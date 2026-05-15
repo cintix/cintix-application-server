@@ -13,6 +13,7 @@ import dk.cintix.application.server.infrastructure.annotations.OnMessage;
 import dk.cintix.application.server.infrastructure.annotations.OnOpen;
 import dk.cintix.application.server.infrastructure.annotations.WebSocket;
 import dk.cintix.application.server.modules.http.server.HttpModule;
+import dk.cintix.application.server.modules.http.server.services.GraphQLEndpoint;
 import dk.cintix.application.server.modules.http.server.services.JsonServiceDescriptionEngine;
 import dk.cintix.application.server.modules.http.server.services.WebSocketService;
 import dk.cintix.application.server.modules.http.server.services.jsd.models.API;
@@ -154,8 +155,26 @@ public abstract class RestHttpServer implements HttpModule {
     }
 
     @Override
+    public void addEndpoint(String path, Object... endpoints) {
+        for (Object endpoint : endpoints) {
+            addEndpoint(path, endpoint);
+        }
+    }
+
+    @Override
     public void addWebSocket(String path, Object handler) {
         registerWebSocketEndpoint(webSocketService, path, handler);
+    }
+
+    @Override
+    public void addGraphQLEndpoint(String path, Object service) {
+        addGraphQLEndpoint(path, new Object[]{service});
+    }
+
+    @Override
+    public void addGraphQLEndpoint(String path, Object... services) {
+        GraphQLEndpoint endpoint = new GraphQLEndpoint(services);
+        addEndpoint(path, endpoint);
     }
 
     public WebSocketService getWebSocketService() {

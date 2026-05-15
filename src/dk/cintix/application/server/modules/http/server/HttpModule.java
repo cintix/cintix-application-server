@@ -16,7 +16,10 @@ public interface HttpModule {
     void bind(InetSocketAddress address) throws Exception;
     void bind(InetSocketAddress address, int backlog) throws Exception;
     void addEndpoint(String path, Object endpoint);
+    void addEndpoint(String path, Object... endpoints);
     void addWebSocket(String path, Object handler);
+    void addGraphQLEndpoint(String path, Object service);
+    void addGraphQLEndpoint(String path, Object... services);
     boolean startServer() throws Exception;
     void setDocumentRoot(String documentRoot);
     String getDocumentRoot();

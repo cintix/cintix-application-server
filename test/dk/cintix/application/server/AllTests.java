@@ -6,6 +6,7 @@ import dk.cintix.application.server.jdbc.EntityManagerInjectionTest;
 import dk.cintix.application.server.jdbc.PooledDataSourceTest;
 import dk.cintix.application.server.jdbc.TransactionableConnectionTest;
 import dk.cintix.application.server.rest.RestActionCacheKeyTest;
+import dk.cintix.application.server.rest.http.GraphQLEndpointTest;
 import dk.cintix.application.server.rest.http.ServerPagePropertyMergeTest;
 import dk.cintix.application.server.rest.http.RestHttpServerPathTest;
 import dk.cintix.application.server.rest.http.utils.HttpUtilTest;
@@ -24,6 +25,7 @@ public class AllTests {
         new MimeTypesTest().runAll();
         new ByteMemoryStreamTest().runAll();
         new CacheTest().runAll();
+        new GraphQLEndpointTest().runAll();
         System.out.println("All tests passed.");
     }
 }
