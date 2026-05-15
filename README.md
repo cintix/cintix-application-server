@@ -61,5 +61,22 @@ A plugin architecture was considered to keep the server lightweight — load onl
 
 The planned design: a `Plugin` interface loaded via `ServiceLoader`. Drop a jar in `lib/` with the service descriptor, done. Core (REST, WebSocket, SSL) stays built-in. Domain modules (GraphQL, JDBC) become plugins.
 
+### Potential future plugins
+
+These follow the annotation-driven pattern already established. Listed roughly by production priority:
+
+| Plugin | Purpose |
+|--------|---------|
+| **Auth** | `@Authenticated` annotation, JWT validation, OAuth2 client. Request interceptor before `@Action` methods. |
+| **Rate limiter** | `@RateLimit(requests = 100, per = MINUTE)` — per-IP or per-token in-memory buckets. |
+| **Scheduler** | `@Scheduled(cron = "*/5 * * * *")` on methods. Uses JDK `ScheduledExecutorService`, no external dependency. |
+| **Health checks** | `@HealthCheck` annotation, aggregated `/health` endpoint. DB, disk, memory probes. |
+| **CORS** | `@CrossOrigin` annotation on endpoints. Simple header injection. |
+| **Metrics** | Prometheus `/metrics` endpoint. Request counts, response times, active connections. |
+| **OpenAPI** | Like the built-in `?jsd` generator but producing OpenAPI 3.0 spec. `@ApiDoc` annotations for descriptions. |
+| **SSE** | `@SSE(path)` annotation for Server-Sent Events. Simpler than WebSocket for one-way streaming. |
+| **Multipart upload** | `@Upload` annotation, stream files to disk. |
+| **Redis** | Connection pool + `@Cache` backed by Redis instead of in-memory.
+
 ## Current Status
 The codebase has been recently reviewed and hardened in request parsing, cache correctness, server-page parameter merging, session id uniqueness, SSL keystore loading, and JDBC transaction/pool stability.
