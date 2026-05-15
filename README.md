@@ -48,5 +48,18 @@ java -cp build/classes:build/test/classes:lib/* dk.cintix.application.server.All
 - `SSLContextManager` builds a `TLS` context from the keystore key/password.
 - Ensure `.keystore` exists and matches the provided key password.
 
+## Features added since v1
+
+- **WebSocket** — annotation-driven (`@WebSocket`, `@OnOpen`, `@OnMessage`, `@OnBinary`, `@OnClose`, `@OnError`), RFC 6455 frame handling, built-in broadcaster for fan-out to all sessions on a path.
+- **GraphQL** — query and mutation engine with built-in lexer/parser/executor. Register via `addGraphQLEndpoint(path, handler)` with `@Query`/`@Mutation` annotations.
+
+## Future Plugin System
+
+A plugin architecture was considered to keep the server lightweight — load only what you need.
+
+**Decision:** not yet. Domain-specific modules (GraphQL, JDBC) are already cleanly separated. Not calling `addGraphQLEndpoint` means GraphQL costs nothing. A plugin system will be implemented when jar size, independent versioning, or third-party contributions justify the added complexity.
+
+The planned design: a `Plugin` interface loaded via `ServiceLoader`. Drop a jar in `lib/` with the service descriptor, done. Core (REST, WebSocket, SSL) stays built-in. Domain modules (GraphQL, JDBC) become plugins.
+
 ## Current Status
 The codebase has been recently reviewed and hardened in request parsing, cache correctness, server-page parameter merging, session id uniqueness, SSL keystore loading, and JDBC transaction/pool stability.
