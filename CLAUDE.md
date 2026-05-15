@@ -73,3 +73,60 @@ Served from `DOCUMENT_ROOT` (default `"web"`, configurable via `setDocumentRoot(
 ### Java 8 target
 
 Source and target are Java 1.8 (`javac.source=1.8`, `javac.target=1.8`). No lambdas/streams used extensively — reflection-heavy patterns for annotation processing and dependency injection.
+
+## Plugin Architecture (Future)
+
+A plugin system was considered to keep the server lightweight — load only what you need.
+
+### Decision: not yet
+
+The current structure already achieves the goal. Domain-specific modules (`graphql`, `database`) are cleanly separated packages. If you don't call `addGraphQLEndpoint`, GraphQL costs nothing at runtime. The only cost is JVM classpath presence, which for two plugins is negligible.
+
+### When to implement
+
+A plugin system becomes worth it when:
+
+- **Jar size matters** — database module pulls `postgresql-42.2.8.jar` (~900KB). Only include it if you use it.
+- **Independent versioning** — ship `graphql-plugin-1.1.jar` without touching core.
+- **Third-party contributions** — someone builds an auth plugin and publishes it independently.
+
+### Proposed design (when the time comes)
+
+```
+lib/
+  cintix-graphql-plugin.jar   ← contains META-INF/services/dk...Plugin
+  cintix-jdbc-plugin.jar
+```
+
+**Plugin interface:**
+```java
+public interface Plugin {
+    void register(HttpModule server);
+}
+```
+
+Loaded via `java.util.ServiceLoader` in `ModuleRegistry.initialize()`. Each plugin registers itself by calling the appropriate `server.add*()` methods.
+
+**What stays core (always):**
+- NIO event loop + HTTP parsing
+- REST annotations + routing
+- WebSocket (HTTP upgrade, protocol-level)
+- SSL/TLS (transport, protocol-level)
+- Static file serving + MimeTypes
+- Infrastructure (Cache, ReflectionUtil, Status, Application)
+
+**What becomes plugins:**
+- GraphQL — query language, not every app needs it
+- JDBC/Database — ORM + pooling, not every app has a database
+
+### Pros
+- Core jar stays small (~100KB without plugins)
+- Each plugin independently versioned and released
+- Third parties can contribute plugins without touching core
+- Clear boundary: core never imports from plugin code
+
+### Cons
+- `ServiceLoader` discovery adds complexity
+- Plugin authors must follow the module contract
+- Cross-plugin dependencies (e.g. auth needs database) require careful design
+- Currently only two candidates — overhead may exceed benefit
