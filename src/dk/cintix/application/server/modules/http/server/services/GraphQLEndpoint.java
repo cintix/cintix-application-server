@@ -1,6 +1,6 @@
 package dk.cintix.application.server.modules.http.server.services;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
 import dk.cintix.application.server.infrastructure.annotations.Action;
 import dk.cintix.application.server.infrastructure.annotations.POST;
 import dk.cintix.application.server.modules.http.server.services.domain.models.Response;
@@ -20,7 +20,7 @@ public class GraphQLEndpoint {
 
     private final GraphQLRegistry registry;
     private final Executor executor;
-    private final ObjectMapper mapper;
+    private final Gson gson;
 
     public GraphQLEndpoint(Object... services) {
         this.registry = new GraphQLRegistry();
@@ -28,7 +28,7 @@ public class GraphQLEndpoint {
             registry.register(service);
         }
         this.executor = new Executor(registry);
-        this.mapper = new ObjectMapper();
+        this.gson = new Gson();
     }
 
     @POST
@@ -38,7 +38,7 @@ public class GraphQLEndpoint {
             Parser parser = new Parser(query);
             Document doc = parser.parse();
             Map<String, Object> result = executor.execute(doc);
-            String json = mapper.writeValueAsString(result);
+            String json = gson.toJson(result);
             return new Response().OK().ContentType("application/json").data(json);
         } catch (Exception e) {
             try {
@@ -48,7 +48,7 @@ public class GraphQLEndpoint {
                 java.util.List<Map<String, Object>> errors = new java.util.ArrayList<>();
                 errors.add(error);
                 errorBody.put("errors", errors);
-                String json = mapper.writeValueAsString(errorBody);
+                String json = gson.toJson(errorBody);
                 return new Response().BadRequest().ContentType("application/json").data(json);
             } catch (Exception ex) {
                 return new Response().InternalServerError().data("{\"errors\":[{\"message\":\"Internal error\"}]}");
