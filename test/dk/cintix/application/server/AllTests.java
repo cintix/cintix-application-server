@@ -2,6 +2,7 @@ package dk.cintix.application.server;
 
 import dk.cintix.application.server.io.cache.CacheTest;
 import dk.cintix.application.server.io.memory.ByteMemoryStreamTest;
+import dk.cintix.application.server.infrastructure.modules.PluginSystemTest;
 import dk.cintix.application.server.jdbc.EntityManagerInjectionTest;
 import dk.cintix.application.server.jdbc.PooledDataSourceTest;
 import dk.cintix.application.server.jdbc.TransactionableConnectionTest;
@@ -26,6 +27,7 @@ public class AllTests {
         new ByteMemoryStreamTest().runAll();
         new CacheTest().runAll();
         new GraphQLEndpointTest().runAll();
+        new PluginSystemTest().runAll();
         System.out.println("All tests passed.");
     }
 }

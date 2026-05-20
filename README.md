@@ -11,11 +11,13 @@ Cintix Application Server is a lightweight Java 8 REST application server with b
 - SSL keystore loading and TLS context creation
 
 ## Project Layout
-- `src/dk/cintix/application/server/rest` REST action dispatch and endpoint model
-- `src/dk/cintix/application/server/rest/http` HTTP server loop, request parsing, sessions
-- `src/dk/cintix/application/server/jdbc` datasource, pooling, transaction helpers
-- `src/dk/cintix/application/server/ssl` SSL context and certificate loading
-- `src/dk/cintix/application/server/io` shared utilities (cache, memory stream, reflection)
+- `src/dk/cintix/application/server/modules/http/server` REST routing, HTTP server loop, request parsing, sessions, WebSocket support
+- `src/dk/cintix/application/server/modules/graphql` GraphQL plugin contract, endpoint adapter, parser, executor, registry
+- `src/dk/cintix/application/server/modules/ratelimit` rate limit plugin and request filter
+- `src/dk/cintix/application/server/modules/scheduler` scheduler plugin and fixed-rate job support
+- `src/dk/cintix/application/server/modules/database` datasource, pooling, transaction helpers
+- `src/dk/cintix/application/server/modules/security` SSL context and certificate loading
+- `src/dk/cintix/application/server/infrastructure` shared utilities, annotations, plugin contracts, module registry
 - `lib/` third-party jars (Gson, PostgreSQL driver, HTML engine)
 - `test/` regression tests (happy/unhappy paths)
 
@@ -40,7 +42,7 @@ Run the full regression suite with:
 
 ```bash
 ant compile-test
-java -cp build/classes:build/test/classes:lib/* dk.cintix.application.server.AllTests
+java -cp 'build/classes:build/test/classes:lib/*' dk.cintix.application.server.AllTests
 ```
 
 ## SSL Notes
@@ -51,25 +53,49 @@ java -cp build/classes:build/test/classes:lib/* dk.cintix.application.server.All
 ## Features added since v1
 
 - **WebSocket** — annotation-driven (`@WebSocket`, `@OnOpen`, `@OnMessage`, `@OnBinary`, `@OnClose`, `@OnError`), RFC 6455 frame handling, built-in broadcaster for fan-out to all sessions on a path.
-- **GraphQL** — query and mutation engine with built-in lexer/parser/executor. Register via `addGraphQLEndpoint(path, handler)` with `@Query`/`@Mutation` annotations.
+- **GraphQL plugin** — query and mutation engine with built-in lexer/parser/executor. Register the plugin, then call `graphql.addEndpoint(path, service)` with `@GraphQLModule.Query`/`@GraphQLModule.Mutation` annotations.
 
-## Future Plugin System
+## Plugin System
 
-A plugin architecture was considered to keep the server lightweight — load only what you need.
+The server has a lightweight plugin architecture to keep core HTTP/REST small while allowing optional capabilities.
 
-**Decision:** not yet. Domain-specific modules (GraphQL, JDBC) are already cleanly separated. Not calling `addGraphQLEndpoint` means GraphQL costs nothing. A plugin system will be implemented when jar size, independent versioning, or third-party contributions justify the added complexity.
+Plugins implement `dk.cintix.application.server.infrastructure.modules.Plugin` and are wired through `ModuleRegistry`. They can be registered directly or discovered with `ServiceLoader` via `META-INF/services/dk.cintix.application.server.infrastructure.modules.Plugin`.
 
-The planned design: a `Plugin` interface loaded via `ServiceLoader`. Drop a jar in `lib/` with the service descriptor, done. Core (REST, WebSocket, SSL) stays built-in. Domain modules (GraphQL, JDBC) become plugins.
+Core (REST, WebSocket, SSL, static files) stays built-in. GraphQL, rate limiting, and scheduling are plugins. JDBC/database remains built in for now and is a future extraction candidate.
 
-### Potential future plugins
+Example:
+```java
+PluginContext context = ModuleRegistry.initialize(server, new GraphQLModuleService());
+GraphQLModule graphql = context.getModule(GraphQLModule.class);
+graphql.addEndpoint("/graphql", new UserQueries(), new ProductQueries(), new OrderMutations());
+```
+
+GraphQL service classes use annotations from the module contract:
+```java
+public class UserQueries {
+    @GraphQLModule.Query("user")
+    public User user(String id) {
+        return findUser(id);
+    }
+}
+
+public class OrderMutations {
+    @GraphQLModule.Mutation("createOrder")
+    public Order createOrder(String productId) {
+        return createOrderFor(productId);
+    }
+}
+```
+
+One GraphQL endpoint can register one or more service classes. Core HTTP no longer exposes `addGraphQLEndpoint`; use the `GraphQLModule` contract instead.
+
+### Additional potential future plugins
 
 These follow the annotation-driven pattern already established. Listed roughly by production priority:
 
 | Plugin | Purpose |
 |--------|---------|
 | **Auth** | `@Authenticated` annotation, JWT validation, OAuth2 client. Request interceptor before `@Action` methods. |
-| **Rate limiter** | `@RateLimit(requests = 100, per = MINUTE)` — per-IP or per-token in-memory buckets. |
-| **Scheduler** | `@Scheduled(cron = "*/5 * * * *")` on methods. Uses JDK `ScheduledExecutorService`, no external dependency. |
 | **Health checks** | `@HealthCheck` annotation, aggregated `/health` endpoint. DB, disk, memory probes. |
 | **CORS** | `@CrossOrigin` annotation on endpoints. Simple header injection. |
 | **Metrics** | Prometheus `/metrics` endpoint. Request counts, response times, active connections. |

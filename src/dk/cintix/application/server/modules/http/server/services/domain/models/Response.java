@@ -107,6 +107,11 @@ public class Response {
         return this;
     }
 
+    public Response TooManyRequests() {
+        status = Status.TooManyRequests.getValue();
+        return this;
+    }
+
     public Response BadGateway() {
         status = Status.BadGateway.getValue();
         return this;
@@ -267,6 +272,9 @@ public class Response {
         }
         if (code == 404) {
             return "Not Found";
+        }
+        if (code == 429) {
+            return "Too Many Requests";
         }
         if (code == 502) {
             return "Bad Gateway";

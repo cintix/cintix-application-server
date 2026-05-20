@@ -97,6 +97,9 @@ hs_err_pid*
 .idea/libraries
 
 META-INF/
+!src/META-INF/
+!src/META-INF/services/
+!src/META-INF/services/*
 
 # Mongo Explorer plugin:
 .idea/mongoSettings.xml

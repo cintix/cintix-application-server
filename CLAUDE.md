@@ -17,12 +17,12 @@ Apache Ant from repo root:
 
 **Run all tests:**
 ```bash
-ant compile-test && java -cp build/classes:build/test/classes:lib/* dk.cintix.application.server.AllTests
+ant compile-test && java -cp 'build/classes:build/test/classes:lib/*' dk.cintix.application.server.AllTests
 ```
 
 **Run a single test file:**
 ```bash
-ant compile-test && java -cp build/classes:build/test/classes:lib/* dk.cintix.application.server.rest.http.RestHttpServerPathTest
+ant compile-test && java -cp 'build/classes:build/test/classes:lib/*' dk.cintix.application.server.rest.http.RestHttpServerPathTest
 ```
 
 Tests use a custom assertion framework in `TestSupport` (no JUnit); each test class has a `runAll()` method. `AllTests` is the test suite runner.
@@ -51,14 +51,16 @@ The regex router supports path parameters using `:paramName` → `([^/]+)` subst
 
 ### Key packages
 
-- `rest/http/` — NIO server loop, request parsing, HTTP session management
-- `rest/` — `RestAction`, `RestEndpoint`, `RestClient`, annotation definitions
-- `rest/response/` — `Response` builder (fluent API: `.OK().ContentType(...).model(obj)`)
-- `rest/jsd/` — JSON Service Description engine (auto-generates API docs at `?jsd`)
-- `jdbc/` — `EntityManager` (annotation-based ORM), `PooledDataSource`, `TransactionableConnection`, `DataSourceManager` (JNDI lookup)
-- `ssl/` — `SSLContextManager` loads JKS keystore, creates TLS context
-- `io/` — `ReflectionUtil`, `Cache`, `ByteMemoryStream`
-- `model/generators/` — `ModelGenerator` interface with `JSONGenerator` (Gson) and `TextGenerator` implementations
+- `modules/http/server/` — HTTP module contract, NIO server loop, request parsing, endpoint registration, static files, WebSocket support
+- `modules/http/server/services/` — REST action dispatch, JSON service description, response models, model generators
+- `modules/graphql/` — GraphQL plugin contract; register endpoints with `graphql.addEndpoint(...)`
+- `modules/graphql/endpoint/` — HTTP adapter for GraphQL POST requests
+- `modules/graphql/services/domain/` — GraphQL lexer/parser/AST/executor/registry internals
+- `modules/ratelimit/` — rate limit plugin and `@RateLimitModule.RateLimit`
+- `modules/scheduler/` — scheduler plugin and fixed-rate jobs
+- `modules/database/` — `EntityManager` (annotation-based ORM), `PooledDataSource`, `TransactionableConnection`, `DataSourceManager` (JNDI lookup)
+- `modules/security/` — `SSLContextManager` loads JKS keystore, creates TLS context
+- `infrastructure/` — `ReflectionUtil`, `Cache`, `ByteMemoryStream`, REST annotations, plugin contracts, `ModuleRegistry`
 
 ### Static file serving
 
@@ -74,23 +76,31 @@ Served from `DOCUMENT_ROOT` (default `"web"`, configurable via `setDocumentRoot(
 
 Source and target are Java 1.8 (`javac.source=1.8`, `javac.target=1.8`). No lambdas/streams used extensively — reflection-heavy patterns for annotation processing and dependency injection.
 
-## Plugin Architecture (Future)
+## Plugin Architecture
 
-A plugin system was considered to keep the server lightweight — load only what you need.
+The server has a lightweight plugin system for optional capabilities.
 
-### Decision: not yet
+Plugins implement `Plugin` and are wired in `ModuleRegistry` through a `PluginContext`. Plugins can be passed directly to `ModuleRegistry.initialize(httpModule, plugins...)` or discovered with `ServiceLoader` through `META-INF/services/dk.cintix.application.server.infrastructure.modules.Plugin`.
 
-The current structure already achieves the goal. Domain-specific modules (`graphql`, `database`) are cleanly separated packages. If you don't call `addGraphQLEndpoint`, GraphQL costs nothing at runtime. The only cost is JVM classpath presence, which for two plugins is negligible.
+Current plugin modules:
+- `graphql` — register with `GraphQLModule graphql = context.getModule(GraphQLModule.class); graphql.addEndpoint("/graphql", serviceOrServices...);`
+- `ratelimit` — request filter with `@RateLimitModule.RateLimit`
+- `scheduler` — fixed-rate scheduled jobs via `SchedulerModule`
 
-### When to implement
+GraphQL is no longer exposed through HTTP core. Do not reintroduce `HttpModule.addGraphQLEndpoint(...)`. Use:
+```java
+PluginContext context = ModuleRegistry.initialize(httpModule, new GraphQLModuleService());
+GraphQLModule graphql = context.getModule(GraphQLModule.class);
+graphql.addEndpoint("/graphql", new UserQueries(), new ProductQueries(), new OrderMutations());
+```
 
-A plugin system becomes worth it when:
+GraphQL service classes annotate methods through the module contract:
+```java
+@GraphQLModule.Query("user")
+@GraphQLModule.Mutation("createOrder")
+```
 
-- **Jar size matters** — database module pulls `postgresql-42.2.8.jar` (~900KB). Only include it if you use it.
-- **Independent versioning** — ship `graphql-plugin-1.1.jar` without touching core.
-- **Third-party contributions** — someone builds an auth plugin and publishes it independently.
-
-### Proposed design (when the time comes)
+Potential external jar layout:
 
 ```
 lib/
@@ -101,11 +111,12 @@ lib/
 **Plugin interface:**
 ```java
 public interface Plugin {
-    void register(HttpModule server);
+    String getName();
+    void register(PluginContext context);
 }
 ```
 
-Loaded via `java.util.ServiceLoader` in `ModuleRegistry.initialize()`. Each plugin registers itself by calling the appropriate `server.add*()` methods.
+Loaded via `java.util.ServiceLoader` in `ModuleRegistry.loadPlugins(httpModule)`. Each plugin registers its module contract and any HTTP extension points through `PluginContext`.
 
 **What stays core (always):**
 - NIO event loop + HTTP parsing
@@ -115,8 +126,7 @@ Loaded via `java.util.ServiceLoader` in `ModuleRegistry.initialize()`. Each plug
 - Static file serving + MimeTypes
 - Infrastructure (Cache, ReflectionUtil, Status, Application)
 
-**What becomes plugins:**
-- GraphQL — query language, not every app needs it
+**What may become a plugin next:**
 - JDBC/Database — ORM + pooling, not every app has a database
 
 ### Pros
@@ -129,4 +139,3 @@ Loaded via `java.util.ServiceLoader` in `ModuleRegistry.initialize()`. Each plug
 - `ServiceLoader` discovery adds complexity
 - Plugin authors must follow the module contract
 - Cross-plugin dependencies (e.g. auth needs database) require careful design
-- Currently only two candidates — overhead may exceed benefit

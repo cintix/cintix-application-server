@@ -1,20 +1,47 @@
 package dk.cintix.application.server.rest.http;
 
 import dk.cintix.application.server.TestSupport;
-import dk.cintix.application.server.modules.http.server.services.GraphQLEndpoint;
+import dk.cintix.application.server.infrastructure.modules.ModuleRegistry;
+import dk.cintix.application.server.infrastructure.modules.PluginContext;
+import dk.cintix.application.server.modules.graphql.GraphQLModule;
+import dk.cintix.application.server.modules.graphql.endpoint.GraphQLEndpoint;
+import dk.cintix.application.server.modules.graphql.services.GraphQLModuleService;
+import dk.cintix.application.server.modules.http.server.endpoint.RestHttpRequest;
+import dk.cintix.application.server.modules.http.server.endpoint.RestHttpServer;
 import dk.cintix.application.server.modules.http.server.services.domain.models.Response;
-import dk.cintix.application.server.modules.http.server.services.graphql.annotations.Mutation;
-import dk.cintix.application.server.modules.http.server.services.graphql.annotations.Query;
+import dk.cintix.application.server.modules.http.server.services.domain.models.RestEndpoint;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class GraphQLEndpointTest {
 
     public void runAll() throws Exception {
+        pluginRegistersGraphQLEndpoint();
         queryWithoutArguments_returnsJsonResult();
         queryWithArguments_passesArgumentsToMethod();
         mutation_executesAndReturnsResult();
         malformedQuery_returnsError();
         unknownQuery_returnsError();
         subSelection_projectsFields();
+    }
+
+    public void pluginRegistersGraphQLEndpoint() throws Exception {
+        // Arrange
+        RestHttpServer server = new RestHttpServer() {};
+        PluginContext context = ModuleRegistry.initialize(server, new GraphQLModuleService());
+        GraphQLModule graphql = context.getModule(GraphQLModule.class);
+        graphql.addEndpoint("/graphql", new HelloService());
+        RestHttpRequest request = new RestHttpRequest(new LinkedHashMap<String, String>(), new LinkedHashMap<String, String>(), new LinkedHashMap<String, String>(), null, "POST", "/graphql", "{ hello }");
+
+        // Act
+        Response response = handle(server, request);
+        String json = bodyFromResponse(response);
+
+        // Assert
+        TestSupport.assertTrue(json.contains("hello"), "Plugin endpoint should contain hello key");
+        TestSupport.assertTrue(json.contains("World"), "Plugin endpoint should contain result value");
     }
 
     public void queryWithoutArguments_returnsJsonResult() throws Exception {
@@ -116,24 +143,35 @@ public class GraphQLEndpointTest {
         return raw.substring(split + 2);
     }
 
+    @SuppressWarnings("unchecked")
+    private Response handle(RestHttpServer server, RestHttpRequest request) throws Exception {
+        Field pathMappingField = RestHttpServer.class.getDeclaredField("pathMapping");
+        pathMappingField.setAccessible(true);
+        Map<String, Map<String, RestEndpoint>> pathMapping = (Map<String, Map<String, RestEndpoint>>) pathMappingField.get(null);
+
+        Method handleRequestMapping = RestHttpServer.class.getDeclaredMethod("handleRequestMapping", Map.class, RestHttpRequest.class);
+        handleRequestMapping.setAccessible(true);
+        return (Response) handleRequestMapping.invoke(server, pathMapping, request);
+    }
+
     // -- Test services and models --
 
     public static class HelloService {
-        @Query("hello")
+        @GraphQLModule.Query("hello")
         public String hello() {
             return "World";
         }
     }
 
     public static class GreetService {
-        @Query("greet")
+        @GraphQLModule.Query("greet")
         public String greet(String name) {
             return "Hello, " + name;
         }
     }
 
     public static class CreateService {
-        @Mutation("createItem")
+        @GraphQLModule.Mutation("createItem")
         public Item createItem(String name) {
             Item item = new Item();
             item.id = "new-1";
@@ -148,7 +186,7 @@ public class GraphQLEndpointTest {
     }
 
     public static class UserService {
-        @Query("user")
+        @GraphQLModule.Query("user")
         public User user(String id) {
             User u = new User();
             u.name = "John";

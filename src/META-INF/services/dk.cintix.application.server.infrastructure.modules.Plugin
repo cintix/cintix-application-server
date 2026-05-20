@@ -1,0 +1,3 @@
+dk.cintix.application.server.modules.graphql.services.GraphQLModuleService
+dk.cintix.application.server.modules.ratelimit.services.RateLimitModuleService
+dk.cintix.application.server.modules.scheduler.services.SchedulerModuleService

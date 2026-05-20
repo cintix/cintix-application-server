@@ -13,7 +13,6 @@ import dk.cintix.application.server.infrastructure.annotations.OnMessage;
 import dk.cintix.application.server.infrastructure.annotations.OnOpen;
 import dk.cintix.application.server.infrastructure.annotations.WebSocket;
 import dk.cintix.application.server.modules.http.server.HttpModule;
-import dk.cintix.application.server.modules.http.server.services.GraphQLEndpoint;
 import dk.cintix.application.server.modules.http.server.services.JsonServiceDescriptionEngine;
 import dk.cintix.application.server.modules.http.server.services.WebSocketService;
 import dk.cintix.application.server.modules.http.server.services.jsd.models.API;
@@ -60,6 +59,7 @@ public abstract class RestHttpServer implements HttpModule {
     private static final Map<String, Map<String, RestEndpoint>> pathMapping = new LinkedHashMap<>();
     private final Map<String, RestClient> clientSessions = new LinkedHashMap<>();
     private final Map<String, Service> documentationEndpoint = new LinkedHashMap<>();
+    private final List<HttpModule.RequestFilter> requestFilters = new LinkedList<>();
     private final WebSocketService webSocketService = new WebSocketService();
 
     private HttpConnectionEvents connectionEvents;
@@ -167,14 +167,10 @@ public abstract class RestHttpServer implements HttpModule {
     }
 
     @Override
-    public void addGraphQLEndpoint(String path, Object service) {
-        addGraphQLEndpoint(path, new Object[]{service});
-    }
-
-    @Override
-    public void addGraphQLEndpoint(String path, Object... services) {
-        GraphQLEndpoint endpoint = new GraphQLEndpoint(services);
-        addEndpoint(path, endpoint);
+    public void addRequestFilter(HttpModule.RequestFilter filter) {
+        if (filter != null) {
+            requestFilters.add(filter);
+        }
     }
 
     public WebSocketService getWebSocketService() {
@@ -517,10 +513,25 @@ public abstract class RestHttpServer implements HttpModule {
         RestActionService restAction = locateEndpoint(requestMap, contextPath.trim());
 
         if (restAction != null) {
+            Response filteredResponse = applyRequestFilters(request, restAction.getEndpoint());
+            if (filteredResponse != null) {
+                return filteredResponse;
+            }
             return restAction.process(request);
         } else {
             return new Response().NotFound();
         }
+    }
+
+    private Response applyRequestFilters(RestHttpRequest request, RestEndpoint endpoint) {
+        HttpModule.EndpointInfo endpointInfo = new HttpModule.EndpointInfo(endpoint.getPath(), endpoint.getMethod(), endpoint.getObject());
+        for (HttpModule.RequestFilter filter : requestFilters) {
+            Response response = filter.filter(request, endpointInfo);
+            if (response != null) {
+                return response;
+            }
+        }
+        return null;
     }
 
     private RestActionService locateEndpoint(Map<String, RestEndpoint> mapping, String contextPath) throws Exception {

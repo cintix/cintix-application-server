@@ -13,6 +13,7 @@ public enum Status {
     Unauthorized(401),
     Forbidden(403),
     NotFound(404),
+    TooManyRequests(429),
     BadGateway(502),
     ServiceUnavailable(503),
     InternalServerError(500),
