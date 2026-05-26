@@ -11,6 +11,11 @@
     <description>Builds, tests, and runs the project cintix-application-server.</description>
     <import file="nbproject/build-impl.xml"/>
     
+    <target name="-pre-compile">
+        <!-- Use release 8 for portable bytecode compatible with Java 8 through 25 -->
+        <property name="javac.compilerargs" value="--release 8 -parameters"/>
+    </target>
+
     <target name="jar-with-dependencies" depends="jar" description="Builds a jar that includes gson classes.">
         <property name="dist.all.jar" value="${dist.dir}/cintix-application-server-all.jar"/>
         <copy file="${dist.jar}" tofile="${dist.all.jar}" overwrite="true"/>
