@@ -92,7 +92,7 @@ public class RestActionService {
             } else {
                 for (int index = 0; index < parameterTypes.length; index++) {
                     Parameter parameter = parameterTypes[index];
-                    String value = arguments.get(index);
+                    String value = (index < arguments.size()) ? arguments.get(index) : request.getRawPost();
                     methodArguments[index] = valueFromType(parameter, value);
                 }
             }

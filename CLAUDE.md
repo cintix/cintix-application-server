@@ -25,7 +25,7 @@ ant compile-test && java -cp 'build/classes:build/test/classes:lib/*' dk.cintix.
 ant compile-test && java -cp 'build/classes:build/test/classes:lib/*' dk.cintix.application.server.rest.http.RestHttpServerPathTest
 ```
 
-Tests use a custom assertion framework in `TestSupport` (no JUnit); each test class has a `runAll()` method. `AllTests` is the test suite runner.
+Tests use a custom assertion framework in `TestSupport` (no JUnit); each test class has a `runAll()` method. `AllTests` is the test suite runner. Tests follow the AAA pattern with explicit `// Arrange`, `// Act`, `// Assert` comment blocks.
 
 ## Architecture
 
@@ -49,6 +49,16 @@ Endpoints are registered via `server.addEndpoint(path, object)`. Methods use:
 
 The regex router supports path parameters using `:paramName` → `([^/]+)` substitution.
 
+#### Parameter injection (mixed path + body)
+
+`RestActionService.process()` resolves method parameters as follows:
+- **Single param, no path arguments, POST/PUT** → raw body is deserialized into the parameter.
+- **Path arguments present** → each parameter up to `arguments.size()` gets the corresponding URL argument; any remaining parameters receive `request.getRawPost()`. This means methods like `createItem(String spaceId, String body)` work — `spaceId` comes from the path, `body` gets the raw post content.
+
+#### Header handling
+
+`RestHttpRequest.getHeader(key)` is **case-insensitive** — it iterates all stored headers using `equalsIgnoreCase()`. `addHeader(key, value)` normalizes the key to uppercase on storage for consistency with `HttpUtil.parseHeaderKeys`. Regardless of how a header was stored (parsed, added manually, or from an upgrade request), `getHeader("Authorization")` will find it.
+
 ### Key packages
 
 - `modules/http/server/` — HTTP module contract, NIO server loop, request parsing, endpoint registration, static files, WebSocket support
@@ -65,6 +75,12 @@ The regex router supports path parameters using `:paramName` → `([^/]+)` subst
 ### Static file serving
 
 Served from `DOCUMENT_ROOT` (default `"web"`, configurable via `setDocumentRoot()`). HTML files (`.htm`/`.html`) are processed through `cintix-html-engine` for server-page rendering with request parameters merged as template properties. A jail check prevents directory traversal.
+
+### WebSocket
+
+WebSocket handlers are registered via `webSocketService.register(path, handler)` with lifecycle annotations (`@OnOpen`, `@OnMessage`, `@OnBinary`, `@OnClose`, `@OnError`). The `WebSocketSession` object is passed as the first argument to all lifecycle methods.
+
+Query strings from the upgrade request are copied to session attributes with a `qs.` prefix. A client connecting to `/ws/chat?token=abc&room=general` can read `session.getAttribute("qs.token")` → `"abc"` and `session.getAttribute("qs.room")` → `"general"` in its `@OnOpen` handler.
 
 ### Vendored libraries
 

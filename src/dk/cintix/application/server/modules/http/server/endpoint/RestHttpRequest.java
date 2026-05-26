@@ -31,8 +31,10 @@ public class RestHttpRequest {
     }
 
     public String getHeader(String key) {
-        if (headers.containsKey(key)) {
-            return headers.get(key);
+        for (Map.Entry<String, String> entry : headers.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(key)) {
+                return entry.getValue();
+            }
         }
         return null;
     }
@@ -97,7 +99,7 @@ public class RestHttpRequest {
     }
 
     public void addHeader(String key, String value) {
-        headers.put(key, value);
+        headers.put(key.toUpperCase(), value);
     }
 
     public String getContentType() {

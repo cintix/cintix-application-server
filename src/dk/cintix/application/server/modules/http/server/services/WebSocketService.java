@@ -106,6 +106,10 @@ public class WebSocketService {
         clientSession.add("ws-path", path);
         clientSession.add("ws-buffer", ByteBuffer.allocate(8192));
 
+        for (Map.Entry<String, String> qs : request.getQueryStrings().entrySet()) {
+            session.addAttribute("qs." + qs.getKey(), qs.getValue());
+        }
+
         broadcaster.register(path, session);
 
         key.interestOps(SelectionKey.OP_READ);
