@@ -39,7 +39,12 @@ public class WebSocketBroadcaster {
         }
         for (WebSocketSession session : sessions) {
             if (session.isOpen()) {
-                session.send(message);
+                try {
+                    session.send(message);
+                } catch (Exception e) {
+                    // Stale session — unregister so it doesn't break future broadcasts
+                    unregister(path, session);
+                }
             }
         }
     }
@@ -51,7 +56,12 @@ public class WebSocketBroadcaster {
         }
         for (WebSocketSession session : sessions) {
             if (session.isOpen()) {
-                session.send(data);
+                try {
+                    session.send(data);
+                } catch (Exception e) {
+                    // Stale session — unregister so it doesn't break future broadcasts
+                    unregister(path, session);
+                }
             }
         }
     }

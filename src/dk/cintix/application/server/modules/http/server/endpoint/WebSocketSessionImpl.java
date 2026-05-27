@@ -57,6 +57,11 @@ public class WebSocketSessionImpl implements WebSocketSession.SocketChannelWrite
     }
 
     @Override
+    public void enqueuePing() {
+        enqueue(WebSocketFrame.encodePing());
+    }
+
+    @Override
     public void enqueueClose(int statusCode, String reason) {
         enqueue(WebSocketFrame.encodeClose(statusCode, reason));
         closeFrameSent = true;

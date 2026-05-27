@@ -92,6 +92,8 @@ Query strings from the upgrade request are copied to session attributes with a `
 
 Source and target are Java 1.8 (`javac.source=1.8`, `javac.target=1.8`). No lambdas/streams used extensively — reflection-heavy patterns for annotation processing and dependency injection.
 
+To produce portable bytecode that runs on any Java 8 through 25+ JRE, the build uses `--release 8` (configured in `build.xml`). This ensures covariant return types like `ByteBuffer.clear()` resolve to Java 8 signatures regardless of which JDK version performs the compilation.
+
 ## Plugin Architecture
 
 The server has a lightweight plugin system for optional capabilities.
@@ -155,3 +157,16 @@ Loaded via `java.util.ServiceLoader` in `ModuleRegistry.loadPlugins(httpModule)`
 - `ServiceLoader` discovery adds complexity
 - Plugin authors must follow the module contract
 - Cross-plugin dependencies (e.g. auth needs database) require careful design
+
+## Recent Changes
+
+### WebSocket lifecycle robustness (2026-05-27)
+
+Three fixes that together make the WebSocket layer production-ready:
+
+1. **Broadcaster resilience** — `WebSocketBroadcaster.broadcast()` wraps `session.send()` in try-catch. A stale WebSocket session (disconnected at the TCP level but not yet removed from the active session list) can throw `CancelledKeyException` from the NIO layer. Before this fix, one stale session broke the entire broadcast loop. Now the broadcaster catches the exception per-session, unregisters the stale session, and continues broadcasting to all remaining healthy sessions.
+
+2. **IOException cleanup** — `RestHttpServer.handleRead()` now catches `IOException` (and detects `read == -1`) in the WebSocket path. Previously an IOException from a dropped client was swallowed by the outer catch and the session was never cleaned up. Now it calls `handleDisconnect` immediately — session unregistered from broadcaster, key cancelled, channel closed.
+
+3. **Keepalive ping/pong** — A daemon thread (`ws-keepalive`) sends OP_PING every 30 seconds to all WebSocket connections and closes any session that hasn't responded with pong within 10 seconds. This also sweeps for stale sessions where `isOpen() == false` and removes them from the broadcaster. Without this, proxies and firewalls can silently drop idle connections.
+

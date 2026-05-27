@@ -32,6 +32,20 @@ public class WebSocketService {
 
     private final Map<String, HandlerEntry> handlers = new LinkedHashMap<>();
     private final WebSocketBroadcaster broadcaster = new WebSocketBroadcaster();
+    private final Map<String, ConnectionInfo> connections = new LinkedHashMap<>();
+    private final Thread keepaliveThread;
+    private volatile boolean keepaliveRunning = true;
+
+    public WebSocketService() {
+        keepaliveThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                keepaliveLoop();
+            }
+        }, "ws-keepalive");
+        keepaliveThread.setDaemon(true);
+        keepaliveThread.start();
+    }
 
     public WebSocketBroadcaster getBroadcaster() {
         return broadcaster;
@@ -114,6 +128,10 @@ public class WebSocketService {
 
         key.interestOps(SelectionKey.OP_READ);
 
+        synchronized (connections) {
+            connections.put(session.getId(), new ConnectionInfo(session, path, key, channel));
+        }
+
         invokeMethod(entry.onOpen, entry.handler, session);
     }
 
@@ -153,6 +171,12 @@ public class WebSocketService {
                         channel.write(ByteBuffer.wrap(WebSocketFrame.encodePong(frame.payload)));
                         break;
                     case WebSocketFrame.OP_PONG:
+                        synchronized (connections) {
+                            ConnectionInfo info = connections.get(session.getId());
+                            if (info != null) {
+                                info.lastPongTime = System.currentTimeMillis();
+                            }
+                        }
                         break;
                     case WebSocketFrame.OP_CLOSE:
                         int statusCode = 1000;
@@ -194,6 +218,9 @@ public class WebSocketService {
         if (session != null && path != null) {
             session.setOpen(false);
             broadcaster.unregister(path, session);
+            synchronized (connections) {
+                connections.remove(session.getId());
+            }
         }
     }
 
@@ -214,6 +241,73 @@ public class WebSocketService {
             method.invoke(handler, args);
         } catch (IllegalAccessException | InvocationTargetException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void keepaliveLoop() {
+        while (keepaliveRunning) {
+            try {
+                Thread.sleep(30_000);
+            } catch (InterruptedException e) {
+                break;
+            }
+
+            long now = System.currentTimeMillis();
+            List<ConnectionInfo> staleConnections = new java.util.ArrayList<>();
+
+            synchronized (connections) {
+                // First pass: send pings and detect stale sessions
+                for (ConnectionInfo info : connections.values()) {
+                    if (!info.session.isOpen()) {
+                        staleConnections.add(info);
+                        continue;
+                    }
+                    // Send ping if we haven't sent one in the last 30s
+                    if (now - info.lastPingTime >= 30_000) {
+                        info.session.ping();
+                        info.lastPingTime = now;
+                    }
+                    // If we sent a ping over 10s ago and still no pong response
+                    if (info.lastPingTime > info.lastPongTime
+                            && now - info.lastPingTime >= 10_000) {
+                        staleConnections.add(info);
+                    }
+                }
+
+                // Second pass: clean up stale connections
+                for (ConnectionInfo info : staleConnections) {
+                    connections.remove(info.session.getId());
+                    info.session.setOpen(false);
+                }
+            }
+
+            // Close channels outside the lock
+            for (ConnectionInfo info : staleConnections) {
+                broadcaster.unregister(info.path, info.session);
+                try {
+                    info.key.cancel();
+                    info.channel.close();
+                } catch (IOException ignored) {
+                }
+            }
+        }
+    }
+
+    private static class ConnectionInfo {
+        final WebSocketSession session;
+        final String path;
+        final SelectionKey key;
+        final SocketChannel channel;
+        long lastPingTime;
+        long lastPongTime;
+
+        ConnectionInfo(WebSocketSession session, String path, SelectionKey key, SocketChannel channel) {
+            this.session = session;
+            this.path = path;
+            this.key = key;
+            this.channel = channel;
+            this.lastPingTime = System.currentTimeMillis();
+            this.lastPongTime = System.currentTimeMillis();
         }
     }
 

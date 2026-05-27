@@ -55,6 +55,13 @@ public class WebSocketSession {
         writer.enqueueBinary(data);
     }
 
+    public void ping() {
+        if (!open || writer == null) {
+            return;
+        }
+        writer.enqueuePing();
+    }
+
     public void close(int statusCode, String reason) {
         if (!open || writer == null) {
             return;
@@ -80,6 +87,7 @@ public class WebSocketSession {
     public interface SocketChannelWriter {
         void enqueueText(String text);
         void enqueueBinary(byte[] data);
+        void enqueuePing();
         void enqueueClose(int statusCode, String reason);
     }
 

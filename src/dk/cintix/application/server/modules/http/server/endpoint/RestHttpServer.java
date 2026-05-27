@@ -318,9 +318,8 @@ public abstract class RestHttpServer implements HttpModule {
 
         // WebSocket mode: write queued frames, keep connection open
         if (clientSession.get("ws-mode") != null) {
-            try (SocketChannel client = (SocketChannel) key.channel()) {
-                webSocketService.handleWrite(clientSession, client);
-            }
+            SocketChannel client = (SocketChannel) key.channel();
+            webSocketService.handleWrite(clientSession, client);
             return;
         }
 
@@ -344,12 +343,21 @@ public abstract class RestHttpServer implements HttpModule {
         // WebSocket mode: read raw bytes and dispatch frames
         if (clientSession.get("ws-mode") != null) {
             dataBuffer.clear();
-            int read = client.read(dataBuffer);
+            int read;
+            try {
+                read = client.read(dataBuffer);
+            } catch (IOException e) {
+                handleDisconnect(key);
+                return;
+            }
             if (read > 0) {
                 dataBuffer.flip();
                 byte[] bytes = new byte[read];
                 dataBuffer.get(bytes);
                 webSocketService.handleFrame(bytes, clientSession, key, client);
+            } else if (read == -1) {
+                handleDisconnect(key);
+                return;
             }
             return;
         }

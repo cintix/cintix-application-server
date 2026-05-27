@@ -106,9 +106,10 @@ These follow the annotation-driven pattern already established. Listed roughly b
 
 ## Recent improvements
 
+- **WebSocket lifecycle robustness** — Three fixes harden the WebSocket layer: (1) `WebSocketBroadcaster` catches stale session exceptions without breaking the broadcast loop, (2) `IOException` on dropped WebSocket connections triggers immediate cleanup instead of leaking the session, (3) a keepalive daemon thread sends server-initiated ping every 30s and closes connections that don't respond within 10s, preventing proxy/firewall drops of idle connections.
 - **WebSocket query strings** — Query parameters from the upgrade request (`/ws/chat?token=abc`) are copied to `WebSocketSession` attributes with a `qs.` prefix. Access them in `@OnOpen` via `session.getAttribute("qs.token")`.
 - **Header case-insensitivity** — `RestHttpRequest.getHeader()` uses case-insensitive lookup. `getHeader("Authorization")` works regardless of whether the client sent `AUTHORIZATION`, `Authorization`, or `authorization`.
 - **Mixed path + body parameters** — `RestActionService` now supports endpoint methods that combine path variables (`{spaceId}`) with a raw body parameter. Previously this caused an `IndexOutOfBounds`; now remaining parameters fall back to `request.getRawPost()`.
 
 ## Current Status
-The codebase has been recently reviewed and hardened in request parsing, cache correctness, server-page parameter merging, session id uniqueness, SSL keystore loading, and JDBC transaction/pool stability.
+The codebase has been recently hardened with case-insensitive header lookups, mixed path+body parameter support, WebSocket query string passthrough (`qs.*` attributes), and resilient WebSocket broadcasting that handles stale sessions without breaking fan-out.
