@@ -95,11 +95,11 @@ public class RestActionServiceMixedParamsTest {
 
     private String bodyFromResponse(Response response) {
         String raw = new String(response.build());
-        int split = raw.indexOf("\n\n");
+        int split = raw.indexOf("\r\n\r\n");
         if (split == -1) {
             return "";
         }
-        return raw.substring(split + 2);
+        return raw.substring(split + 4);
     }
 
     public static class MixedEndpoint {

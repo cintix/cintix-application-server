@@ -200,15 +200,15 @@ public class Response {
 
     public byte[] build() {
         ByteMemoryStream outputStream = new ByteMemoryStream();
-        String response = "HTTP/1.1 " + status + " " + messageFromStatus(status) + "\n";
-        response += "Date: " + dateFormat.format(new Date()) + "\n";
+        String response = "HTTP/1.1 " + status + " " + messageFromStatus(status) + "\r\n";
+        response += "Date: " + dateFormat.format(new Date()) + "\r\n";
 
         if (!header.containsKey("Server")) {
-            response += "Server: Cintix-Application-Server(CAS)/1.5\n";
+            response += "Server: Cintix-Application-Server(CAS)/1.5\r\n";
         }
 
         for (String key : header.keySet()) {
-            response += key + ": " + header.get(key) + "\n";
+            response += key + ": " + header.get(key) + "\r\n";
         }
         if (!header.containsKey("Content-Type") && content.length > 0) {
             response += "Content-Type: " + contentType;
@@ -224,15 +224,15 @@ public class Response {
             if (contentType.toLowerCase().contains("html")) {
                 response += "; charset=utf-8";
             }
-            response += "\n";
+            response += "\r\n";
         }
 
         if (!header.containsKey("Connection")) {
-            response += "Connection: Closed\n";
+            response += "Connection: Closed\r\n";
         }
 
-        response += "Content-Length: " + content.length + "\n";
-        response += "\n";
+        response += "Content-Length: " + content.length + "\r\n";
+        response += "\r\n";
 
         outputStream.writeBytes(response.getBytes());
         if (content.length > 0) {
