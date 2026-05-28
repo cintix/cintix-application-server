@@ -160,6 +160,20 @@ Loaded via `java.util.ServiceLoader` in `ModuleRegistry.loadPlugins(httpModule)`
 
 ## Recent Changes
 
+### NIO event loop keep-alive and connection handling fix (2026-05-28)
+
+Four fixes that together enable HTTP/1.1 keep-alive and fix connection handling bugs:
+
+1. **Keep-alive support** — `handleWrite` now checks the request's `Connection` header. When the client sends `Connection: keep-alive`, the response is sent with `Connection: Keep-Alive` and the channel is re-registered for `OP_READ` instead of being disconnected. Multiple requests can reuse the same TCP connection.
+
+2. **Removed try-with-resources on SocketChannel** — `handleWrite` previously wrapped `SocketChannel` in try-with-resources, which auto-closed the channel after every write via `Closeable`. The channel is now properly managed by `handleDisconnect` which explicitly calls `client.close()`.
+
+3. **Non-blocking write with partial write handling** — `handleWrite` now uses a write buffer stored in `InternalClientSession`. If `channel.write()` returns 0 (socket buffer full in non-blocking mode), the method returns and waits for the next `OP_WRITE` event. Previously a `while (buffer.hasRemaining())` loop spun forever when the socket buffer was full, hanging the single-threaded event loop.
+
+4. **Event loop key validity** — Added `continue` after each handler (`handleAccept`, `handleRead`, `handleWrite`) because `handleRead` re-registers the channel for `OP_WRITE` (cancels the old key) and `handleWrite` either re-registers for `OP_READ` or disconnects. Without `continue`, the loop called `isWritable()` on a cancelled key, throwing `CancelledKeyException`.
+
+5. **Removed unreliable `InputStream.available()` check** — `handleRead` no longer calls `client.socket().getInputStream().available()` before reading. On non-blocking channels this call is unreliable across JDK implementations. Instead it calls `channel.read()` directly, which returns 0 when no data is available.
+
 ### WebSocket lifecycle robustness (2026-05-27)
 
 Three fixes that together make the WebSocket layer production-ready:
@@ -169,4 +183,38 @@ Three fixes that together make the WebSocket layer production-ready:
 2. **IOException cleanup** — `RestHttpServer.handleRead()` now catches `IOException` (and detects `read == -1`) in the WebSocket path. Previously an IOException from a dropped client was swallowed by the outer catch and the session was never cleaned up. Now it calls `handleDisconnect` immediately — session unregistered from broadcaster, key cancelled, channel closed.
 
 3. **Keepalive ping/pong** — A daemon thread (`ws-keepalive`) sends OP_PING every 30 seconds to all WebSocket connections and closes any session that hasn't responded with pong within 10 seconds. This also sweeps for stale sessions where `isOpen() == false` and removes them from the broadcaster. Without this, proxies and firewalls can silently drop idle connections.
+
+## Production Readiness
+
+The project goal is moving from hobby project to production use — the author is using it to serve paying customer software. All changes and suggestions below must be evaluated through this lens.
+
+### Known architecture limitations
+
+- **Single-threaded event loop.** The NIO event loop in `startServer()` runs accept → read → route-match → action-invoke → write on one thread. A slow database query or file I/O in an endpoint blocks every other connected client. Fixing this requires a worker-thread pool (see roadmap in README.md).
+- **No thread safety.** `pathMapping` is a static `LinkedHashMap` shared across instances with no synchronization. `clientSessions` is a plain `LinkedHashMap`. Once worker threads are introduced, the routing table must be immutable after startup and session state must use concurrent data structures.
+- **Swallowed exceptions.** Several catch blocks are empty (`catch (Exception e) {}`). Replace all of them with proper logging. When the event loop catches an exception, the key that was being processed has already been removed from the selected-keys set — any exception that prevents re-registration or disconnect leaves the client hanging.
+- **No graceful shutdown.** `setRunning(false)` stops the accept loop immediately. In-flight requests are abandoned. A production server needs a drain period with a timeout.
+
+### Production roadmap (see README.md for full checklist)
+
+The prioritized path to production, in order:
+
+1. **Worker-thread pool** — move `handleRequestMapping` + `restAction.process()` off the event loop
+2. **Thread safety** — immutable routing table after startup, `ConcurrentHashMap` for sessions
+3. **Proper logging** — replace `printStackTrace()` / empty catch blocks with `java.util.logging`
+4. **Connection pool validation** — verify `PooledDataSource` defaults
+5. **HTTP/1.1 compliance** — chunked encoding, gzip, Host header validation
+6. **Rate limiting by default** — the `ratelimit` plugin exists, ship it on
+7. **Graceful shutdown** — drain in-flight requests with a timeout
+8. **Health-check endpoint** — `/health` with DB, disk, connection probes
+9. **Request timeout** — idle timeout for partial reads
+
+### Guidelines for production work
+
+- When adding worker threads, keep the NIO event loop single-threaded — only offload the CPU/IO-bound processing, not the socket I/O.
+- The routing table (`pathMapping`) is populated at startup via `addEndpoint()`. After `startServer()` is called, it should be treated as read-only. If hot-reload is needed later, use copy-on-write.
+- `InternalClientSession` is the attachment on every `SelectionKey`. It must remain the bridge between the event loop and worker threads — workers should not touch `SocketChannel` directly.
+- Tests for thread-safety issues must run under load (multiple threads, thousands of iterations). A single-run test won't catch race conditions.
+- The `/health` endpoint should bypass the worker pool entirely — it must respond even when all workers are saturated.
+- `cintix-html-engine` is compiled with `--release 8` for Java 8+ portability. Any changes to that project must preserve the release-8 target.
 

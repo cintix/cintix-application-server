@@ -111,5 +111,31 @@ These follow the annotation-driven pattern already established. Listed roughly b
 - **Header case-insensitivity** — `RestHttpRequest.getHeader()` uses case-insensitive lookup. `getHeader("Authorization")` works regardless of whether the client sent `AUTHORIZATION`, `Authorization`, or `authorization`.
 - **Mixed path + body parameters** — `RestActionService` now supports endpoint methods that combine path variables (`{spaceId}`) with a raw body parameter. Previously this caused an `IndexOutOfBounds`; now remaining parameters fall back to `request.getRawPost()`.
 
+## Production Roadmap
+
+The server is being hardened toward production use. The items below are listed by priority.
+
+### Blocker (must fix before production)
+
+- [ ] **Worker-thread pool for request processing.** The NIO event loop currently runs accept → read → route → invoke → write all in a single thread. A slow database call or file I/O blocks every other connected client. Move `handleRequestMapping` and `RestActionService.process()` onto a thread pool so the event loop only handles I/O (accept/read/write).
+- [ ] **Thread safety.** `pathMapping` is a static `LinkedHashMap` shared across all instances without synchronization. `clientSessions` is a plain `LinkedHashMap` accessed from the event loop. Once worker threads exist, the routing table must be made immutable after startup and the session map must use `ConcurrentHashMap` or equivalent.
+- [ ] **Proper error handling and logging.** Empty catch blocks (`catch (Exception e) {}`) and `printStackTrace()` must be replaced with `java.util.logging` (or SLF4J). Every `500 Internal Server Error` must log the full stack trace with request context (URL, method, client IP).
+- [ ] **Database connection pooling validation.** Verify `PooledDataSource` has correct defaults: minimum/maximum connections, connection timeout, validation query on borrow, and proper cleanup on shutdown.
+
+### High priority (first production release)
+
+- [ ] **Content-Length / body size limits.** `handleRead` currently reads up to 5 MB hardcoded with no validation against the `Content-Length` header. Enforce a configurable max body size and reject requests that exceed it before buffering.
+- [ ] **Proper HTTP/1.1 compliance.** Add support for `Transfer-Encoding: chunked`, `Content-Encoding: gzip`, and validate the `Host` header. Reverse proxies and load balancers expect this.
+- [ ] **Rate limiting enabled by default.** The `ratelimit` plugin already exists. Ship it on by default with sensible limits, especially on login and mutation endpoints.
+- [ ] **Graceful shutdown.** `setRunning(false)` stops the accept loop immediately, but in-flight requests must complete (with a timeout). Add a shutdown hook that drains active connections cleanly.
+- [ ] **Thread-pool saturation handling.** When all worker threads are busy, the server must respond `503 Service Unavailable` rather than queuing requests indefinitely.
+
+### Medium priority (before scaling)
+
+- [ ] **Static file caching.** Files served from `DOCUMENT_ROOT` are read from disk on every request. Add in-memory caching with file modification timestamp checks.
+- [ ] **CORS plugin.** Extract CORS header injection into a proper plugin (listed in the table above).
+- [ ] **Health-check endpoint.** Add a `/health` endpoint that reports DB connectivity, disk space, and active connection count.
+- [ ] **Request timeout.** The event loop has no idle timeout for partial reads. A slow client that sends one byte every 29 seconds keeps a connection open forever.
+
 ## Current Status
 The codebase has been recently hardened with case-insensitive header lookups, mixed path+body parameter support, WebSocket query string passthrough (`qs.*` attributes), and resilient WebSocket broadcasting that handles stale sessions without breaking fan-out.
