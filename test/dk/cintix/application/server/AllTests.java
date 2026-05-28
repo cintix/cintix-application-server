@@ -11,6 +11,7 @@ import dk.cintix.application.server.rest.RestActionServiceMixedParamsTest;
 import dk.cintix.application.server.rest.http.GraphQLEndpointTest;
 import dk.cintix.application.server.rest.http.RestHttpRequestHeaderTest;
 import dk.cintix.application.server.rest.http.ServerPagePropertyMergeTest;
+import dk.cintix.application.server.rest.http.RestHttpServerKeepAliveTest;
 import dk.cintix.application.server.rest.http.RestHttpServerPathTest;
 import dk.cintix.application.server.rest.http.WebSocketQueryStringTest;
 import dk.cintix.application.server.rest.http.utils.HttpUtilTest;
@@ -24,6 +25,7 @@ public class AllTests {
         new RestActionServiceMixedParamsTest().runAll();
         new WebSocketQueryStringTest().runAll();
         new ServerPagePropertyMergeTest().runAll();
+        new RestHttpServerKeepAliveTest().runAll();
         new RestHttpServerPathTest().runAll();
         new RestActionCacheKeyTest().runAll();
         new EntityManagerInjectionTest().runAll();

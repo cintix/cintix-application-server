@@ -73,6 +73,13 @@ public abstract class RestHttpServer implements HttpModule {
     private final ByteBuffer dataBuffer = ByteBuffer.allocate(2048);
     private String documentRoot = "web";
 
+    public int getPort() {
+        if (serverSocket != null && serverSocket.isBound()) {
+            return serverSocket.getLocalPort();
+        }
+        return -1;
+    }
+
     static {
         Application.set("DOCUMENT_ROOT", null);
     }
@@ -256,17 +263,21 @@ public abstract class RestHttpServer implements HttpModule {
 
                     if (key.isAcceptable()) {
                         handleAccept(serverSocketChannel, key);
+                        continue;
                     }
 
                     if (key.isReadable()) {
                         handleRead(key);
+                        continue;
                     }
 
                     if (key.isWritable()) {
                         handleWrite(key);
+                        continue;
                     }
                 }
             } catch (Exception exception) {
+                exception.printStackTrace();
             } finally {
                 selectedKeys.clear();
             }
@@ -290,6 +301,10 @@ public abstract class RestHttpServer implements HttpModule {
         }
 
         key.cancel();
+        SocketChannel client = (SocketChannel) key.channel();
+        if (client.isOpen()) {
+            client.close();
+        }
 
         RestClient restClient = clientSessions.get(clientSession.getSessionId());
         clientSessions.remove(clientSession.getSessionId());
@@ -323,16 +338,54 @@ public abstract class RestHttpServer implements HttpModule {
             return;
         }
 
-        try ( SocketChannel client = (SocketChannel) key.channel()) {
-            Response response = clientSession.getResponse();
-            ByteBuffer buffer = ByteBuffer.wrap(response.build());
-            while (buffer.hasRemaining()) {
-                client.write(buffer);
-            }
+        SocketChannel client = (SocketChannel) key.channel();
+        Response response = clientSession.getResponse();
+        ByteBuffer buffer = clientSession.getWriteBuffer();
 
-            InternalClientSession newSession = new InternalClientSession(clientSession.getSessionId());
+        if (buffer == null) {
+            boolean keepAlive = clientSession.get("request-connection") != null
+                && "keep-alive".equalsIgnoreCase(clientSession.get("request-connection").toString());
+            if (keepAlive) {
+                response.header("Connection", "Keep-Alive");
+            }
+            buffer = ByteBuffer.wrap(response.build());
+            clientSession.setWriteBuffer(buffer);
         }
-        handleDisconnect(key);
+
+        if (buffer.hasRemaining()) {
+            int written = client.write(buffer);
+            if (written == 0) {
+                // Socket buffer full, wait for next OP_WRITE
+                return;
+            }
+        }
+
+        if (buffer.hasRemaining()) {
+            // Partial write, keep OP_WRITE for next selector tick
+            return;
+        }
+
+        // All bytes written — decide keep-alive or close
+        clientSession.setWriteBuffer(null);
+
+        boolean keepAlive = shouldKeepAlive(clientSession, response);
+        if (keepAlive && client.isOpen()) {
+            InternalClientSession newSession = new InternalClientSession(clientSession.getSessionId());
+            client.register(selector, SelectionKey.OP_READ, newSession);
+        } else {
+            handleDisconnect(key);
+        }
+    }
+
+    private boolean shouldKeepAlive(InternalClientSession clientSession, Response response) {
+        // Respect explicit Connection header in the response
+        // Default for HTTP/1.1 is keep-alive; we check the request headers via session
+        String connectionHeader = clientSession.get("request-connection") != null
+            ? clientSession.get("request-connection").toString() : null;
+        if ("keep-alive".equalsIgnoreCase(connectionHeader)) {
+            return true;
+        }
+        return false;
     }
 
     private void handleRead(SelectionKey key) throws Exception {
@@ -363,16 +416,29 @@ public abstract class RestHttpServer implements HttpModule {
         }
 
         dataBuffer.clear();
-        String data = "";
+        String data = null;
 
         int read;
         int totalRead = 0;
         int MAX_BYTES = 1024 * 1024 * 5; // 5MB
 
-        if (client.socket() == null || client.socket().getInputStream() == null || client.socket().getInputStream().available() < 1) {
+        int readResult = client.read(dataBuffer);
+        if (readResult == -1) {
+            handleDisconnect(key);
+            return;
+        }
+        if (readResult == 0) {
             return;
         }
 
+        totalRead += readResult;
+        dataBuffer.flip();
+        byte[] bytes = new byte[dataBuffer.limit()];
+        dataBuffer.get(bytes);
+        data = new String(bytes);
+        dataBuffer.clear();
+
+        // Read any additional available data
         while ((read = client.read(dataBuffer)) > 0) {
             totalRead += read;
             if (totalRead > MAX_BYTES) {
@@ -380,15 +446,21 @@ public abstract class RestHttpServer implements HttpModule {
             }
 
             dataBuffer.flip();
-            byte[] bytes = new byte[dataBuffer.limit()];
+            bytes = new byte[dataBuffer.limit()];
             dataBuffer.get(bytes);
             data += new String(bytes);
             dataBuffer.clear();
         }
 
-        if (data.length() > 0) {
+        if (data != null && data.length() > 0) {
             notifyEvent(data);
             RestHttpRequest request = parseRequest(restClient, client, data);
+
+            // Store Connection header for keep-alive decision in handleWrite
+            String connectionHeader = request.getHeader("Connection");
+            if (connectionHeader != null) {
+                clientSession.add("request-connection", connectionHeader);
+            }
 
             // Check for WebSocket upgrade before normal routing
             if (webSocketService.isWebSocketUpgrade(request)) {
@@ -398,6 +470,10 @@ public abstract class RestHttpServer implements HttpModule {
 
             Response response = handleRequestMapping(pathMapping, request);
             InternalClientSession session = new InternalClientSession(clientSession.getSessionId(), response);
+            // Copy connection header info to new session for keep-alive
+            if (connectionHeader != null) {
+                session.add("request-connection", connectionHeader);
+            }
             client.register(selector, SelectionKey.OP_WRITE, session);
         }
 
