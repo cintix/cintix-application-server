@@ -183,7 +183,7 @@ github_release() {
     step "Creating GitHub release v$NEW_VERSION ..."
 
     local changelog
-    changelog="$(awk -F'|' 'NR>1 && $1!="" {printf "- **v%s** (%s): %s\n", $1, $3, $4}' "$RELEASES_FILE" | head -5)"
+    changelog="$(grep -v '^#' "$RELEASES_FILE" | awk -F' \\| ' '{printf "- **v%s** (%s): %s\\n", $1, $3, $4}' | head -5)"
 
     gh release create "v$NEW_VERSION" \
         --title "v$NEW_VERSION — $RELEASE_DESC" \
@@ -203,9 +203,6 @@ $RELEASE_DESC
 ### Recent releases
 $changelog
 
----
-
-🤖 Released with [release.sh](https://github.com/cintix/cintix-application-server/blob/main/release.sh)
 EOF
 )" \
         "$JAR_FILE" \
