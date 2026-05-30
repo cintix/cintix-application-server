@@ -1,3 +1,4 @@
+2.0.0 | 2026-05-30 | major | Production hardening — worker pool, thread safety, logging, connection pool, HTTP/1.1, rate limiting, graceful shutdown, health checks, request timeout
 # Cintix Application Server — Release History
 # Format: VERSION | DATE | TYPE | DESCRIPTION
 1.5.0 | 2026-05-30 | minor | Production hardening: worker-thread pool, thread safety, proper logging, connection pool validation, HTTP/1.1 compliance, rate limiting (opt-in), graceful shutdown, health-check endpoint, request timeout

@@ -232,7 +232,7 @@ public class Response {
         response += "Date: " + dateFormat.format(new Date()) + "\r\n";
 
         if (!header.containsKey("Server")) {
-            response += "Server: Cintix-Application-Server(CAS)/1.5\r\n";
+            response += "Server: Cintix-Application-Server(CAS)/2.0\r\n";
         }
 
         for (String key : header.keySet()) {
