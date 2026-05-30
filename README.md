@@ -2,7 +2,7 @@
 
 A lightweight, annotation-driven Java 8+ REST application server built on `java.nio` — no servlet container, no external framework. Production-hardened with a worker-thread pool, connection pooling, graceful shutdown, health checks, and pluggable rate limiting.
 
-**~100 KB core jar.** Zero XML configuration. Batteries included.
+**~100 KB core jar.** Zero XML configuration. Batteries included. **LGPL-3.0 licensed.**
 
 ## Quick Start
 
