@@ -183,7 +183,7 @@ github_release() {
     step "Creating GitHub release v$NEW_VERSION ..."
 
     local changelog
-    changelog="$(grep -v '^#' "$RELEASES_FILE" | awk -F' \\| ' '{printf "- **v%s** (%s): %s\\n", $1, $3, $4}' | head -5)"
+    changelog="$(grep -v '^#' "$RELEASES_FILE" | awk -F' \\| ' '{desc=$4; gsub(/@[A-Za-z]+/, "`&`", desc); printf "- **v%s** (%s): %s\\n", $1, $3, desc}' | head -5)"
 
     gh release create "v$NEW_VERSION" \
         --title "v$NEW_VERSION — $RELEASE_DESC" \
