@@ -14,9 +14,9 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Colour
 
 banner() {
-    echo -e "${CYAN}╔══════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║   Cintix Application Server — Release   ║${NC}"
-    echo -e "${CYAN}╚══════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${CYAN}  Cintix Application Server — Release${NC}"
+    echo ""
 }
 
 die() {
@@ -41,7 +41,7 @@ check_prereqs() {
 
 # --- Read current version ---
 current_version() {
-    head -1 "$RELEASES_FILE" | awk '{print $1}'
+    grep -v '^#' "$RELEASES_FILE" | head -1 | awk '{print $1}'
 }
 
 # --- Parse version ---
@@ -66,32 +66,32 @@ bump_version() {
 
 # --- Prompt for release type ---
 prompt_bump_type() {
-    echo ""
-    echo -e "  Current version: ${YELLOW}$(current_version)${NC}"
-    echo ""
-    echo "  Select release type:"
-    echo "    1) major   — breaking changes"
-    echo "    2) minor   — new features (default)"
-    echo "    3) bugfix  — bug fixes only"
-    echo ""
+    # All prompts go to stderr because this function is called via $(...)
+    echo "" >&2
+    echo -e "  Nuværende version: ${YELLOW}$(current_version)${NC}" >&2
+    echo "" >&2
+    echo "  Hvad slags release?" >&2
+    echo "    1 = major   (breaking changes —  1.5.0 → 2.0.0)" >&2
+    echo "    2 = minor   (nye features   —  1.5.0 → 1.6.0)" >&2
+    echo "    3 = bugfix  (fejlrettelser  —  1.5.0 → 1.5.1)" >&2
+    echo "" >&2
 
     local choice
-    read -r -p "  Choice [2]: " choice
+    read -r -p "  Vælg [2]: " choice
     choice="${choice:-2}"
 
     case "$choice" in
         1) echo "major"   ;;
         2) echo "minor"   ;;
         3) echo "bugfix"  ;;
-        *) die "Invalid choice: $choice" ;;
+        *) die "Ugyldigt valg: '$choice' — skriv 1, 2 eller 3" ;;
     esac
 }
 
 # --- Prompt for description ---
 prompt_description() {
     echo ""
-    echo "  Describe this release (one line):"
-    echo "  (Press Enter for editor, or type description)"
+    echo "  Beskriv releasen (en linje):"
     read -r -p "  > " desc
 
     if [[ -z "$desc" ]]; then
@@ -223,10 +223,10 @@ confirm() {
     echo -e "  │  Desc:     ${GREEN}$RELEASE_DESC${NC}  │"
     echo -e "  └─────────────────────────────────────────┘"
     echo ""
-    read -r -p "  Proceed with release? [y/N] " confirm
+    read -r -p "  Kør release? [y/N] " confirm
     case "$confirm" in
-        [yY]|[yY][eE][sS]) return 0 ;;
-        *) die "Release cancelled" ;;
+        [yY]|[yY][eE][sS]|[jJ]|[jJ][aA]) return 0 ;;
+        *) die "Release afbrudt" ;;
     esac
 }
 
