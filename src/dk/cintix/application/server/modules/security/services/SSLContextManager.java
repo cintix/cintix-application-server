@@ -8,6 +8,8 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -15,6 +17,7 @@ import javax.net.ssl.TrustManagerFactory;
  */
 public class SSLContextManager implements SecurityModule {
 
+    private static final Logger logger = Logger.getLogger(SSLContextManager.class.getName());
     private SignedBy signedBy;
 
     public SSLContextManager() {
@@ -52,7 +55,7 @@ public class SSLContextManager implements SecurityModule {
 
             return sslContext;
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.log(Level.SEVERE, "Failed to create SSL context", e);
         }
         return null;
     }

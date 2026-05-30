@@ -19,9 +19,11 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -29,7 +31,8 @@ import java.util.Map;
  */
 public class RestActionService {
 
-    private static final Map<String, dk.cintix.application.server.infrastructure.Cache> _CACHE_MAPS = new LinkedHashMap<>();
+    private static final Logger logger = Logger.getLogger(RestActionService.class.getName());
+    private static final Map<String, dk.cintix.application.server.infrastructure.Cache> _CACHE_MAPS = new ConcurrentHashMap<>();
     private final List<String> arguments;
     private final RestEndpoint endpoint;
     private ModelGenerator generator;
@@ -131,7 +134,7 @@ public class RestActionService {
 
             return response;
         } catch (Exception exception) {
-            exception.printStackTrace();
+            logger.log(Level.SEVERE, "Endpoint processing failed for " + endpoint.getPath(), exception);
             return new Response().InternalServerError().data(exception.toString());
         }
     }

@@ -5,6 +5,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -12,8 +14,11 @@ import java.util.Date;
  */
 public class Log {
 
-    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("YYYY-MM-dd HH:mm:ss.SSS");
-    private static Log instance = null;
+    private static final Logger fallbackLogger = Logger.getLogger(Log.class.getName());
+    private static final ThreadLocal<SimpleDateFormat> dateFormat =
+        ThreadLocal.withInitial(() -> new SimpleDateFormat("YYYY-MM-dd HH:mm:ss.SSS"));
+    private static final Object INSTANCE_LOCK = new Object();
+    private static volatile Log instance = null;
     private final String filename = "log/server.log";
     private FileOutputStream stream = null;
     private int maxTurnOvers = 5;
@@ -27,7 +32,11 @@ public class Log {
 
     public static Log instance() {
         if (instance == null) {
-            instance = new Log();
+            synchronized (INSTANCE_LOCK) {
+                if (instance == null) {
+                    instance = new Log();
+                }
+            }
         }
         return instance;
     }
@@ -123,6 +132,7 @@ public class Log {
                 stream.close();
                 stream = null;
             } catch (IOException iOException) {
+                fallbackLogger.log(Level.WARNING, "Failed to close log stream", iOException);
             }
         }
     }
@@ -139,16 +149,18 @@ public class Log {
                 stream = new FileOutputStream(filename);
             }
         } catch (Exception exception) {
+            fallbackLogger.log(Level.WARNING, "Failed to reset log stream", exception);
         }
     }
 
-    private void appendToLog(String level, Object s) {
+    private synchronized void appendToLog(String level, Object s) {
         try {
             if (stream == null) {
                 stream = new FileOutputStream(filename, true);
             }
-            stream.write(("[" + level + "][" + dateFormat.format(new Date()) + "] " + s.toString() + "\n").getBytes());
+            stream.write(("[" + level + "][" + dateFormat.get().format(new Date()) + "] " + s.toString() + "\n").getBytes());
         } catch (Exception exception) {
+            fallbackLogger.log(Level.WARNING, "Failed to write to log file", exception);
         }
     }
 

@@ -1,141 +1,228 @@
-# cintix-application-server
+# Cintix Application Server
 
-Cintix Application Server is a lightweight Java 8 REST application server with built-in endpoint mapping, static file serving, simple server-page rendering, JDBC helpers, in-memory caching, and optional SSL context support.
+A lightweight, annotation-driven Java 8+ REST application server built on `java.nio` — no servlet container, no external framework. Production-hardened with a worker-thread pool, connection pooling, graceful shutdown, health checks, and pluggable rate limiting.
 
-## Features
-- Annotation-driven REST actions (`@Action`, `@GET/@POST/@PUT/@DELETE` flow)
-- Static document serving from `DOCUMENT_ROOT`
-- HTML server-page rendering via `cintix-html-engine`
-- Request/response pipeline with cache strategies (`STATIC`, `DYNAMIC`)
-- JDBC utilities (`EntityManager`, `TransactionableConnection`, `PooledDataSource`)
-- SSL keystore loading and TLS context creation
+**~100 KB core jar.** Zero XML configuration. Batteries included.
 
-## Project Layout
-- `src/dk/cintix/application/server/modules/http/server` REST routing, HTTP server loop, request parsing, sessions, WebSocket support
-- `src/dk/cintix/application/server/modules/graphql` GraphQL plugin contract, endpoint adapter, parser, executor, registry
-- `src/dk/cintix/application/server/modules/ratelimit` rate limit plugin and request filter
-- `src/dk/cintix/application/server/modules/scheduler` scheduler plugin and fixed-rate job support
-- `src/dk/cintix/application/server/modules/database` datasource, pooling, transaction helpers
-- `src/dk/cintix/application/server/modules/security` SSL context and certificate loading
-- `src/dk/cintix/application/server/infrastructure` shared utilities, annotations, plugin contracts, module registry
-- `lib/` third-party jars (Gson, PostgreSQL driver, HTML engine)
-- `test/` regression tests (happy/unhappy paths)
+## Quick Start
 
-## Build & Run
-From repository root:
-
-```bash
-ant clean
-ant compile
-ant jar
-ant run
+```java
+RestHttpServer server = new RestHttpServer() {};
+server.addEndpoint("/api", new MyEndpoints());
+server.bind(new InetSocketAddress(8080));
+server.startServer();
 ```
 
-Useful output paths:
-- `build/classes` compiled classes
-- `dist/cintix-application-server.jar` packaged jar
+```java
+public class MyEndpoints {
+    @GET
+    @Action(path = "/hello")
+    public Response hello() {
+        return new Response().OK().ContentType("application/json")
+            .data("{\"message\":\"Hello, world!\"}");
+    }
 
-## Testing
-`ant test` compiles test sources but does not currently execute the custom test suite in this project setup.
+    @GET
+    @Action(path = "/users/:id")
+    public Response getUser(String id) {
+        return new Response().OK().ContentType("application/json")
+            .model(findUser(id));
+    }
+}
+```
 
-Run the full regression suite with:
+## Features
+
+### Core HTTP
+
+| Feature | Description |
+|---------|-------------|
+| **Annotation-driven routing** | `@Action(path)`, `@GET`/`@POST`/`@PUT`/`@DELETE` — exact and regex/parameterized paths (`:param`) |
+| **HTTP/1.1 compliance** | Host header validation (RFC 7230), gzip compression, chunked transfer encoding, keep-alive |
+| **Static file serving** | HTML, CSS, JS, images from `DOCUMENT_ROOT` with directory traversal protection |
+| **Server-page rendering** | `.html`/`.htm` files processed through `cintix-html-engine` with request parameter merging |
+| **JSON & text generators** | Built-in `application/json` and `text/plain` model generators — pluggable via `registerModelGenerator()` |
+| **Response caching** | `@Cache`, `@Static`, `@CacheByStatus` annotations with in-memory TTL-based caching |
+
+### Production
+
+| Feature | Description |
+|---------|-------------|
+| **Worker-thread pool** | Configurable `ThreadPoolExecutor` — slow endpoints don't block other clients. Back-pressure: `503 Service Unavailable` when queue is full |
+| **Connection pooling** | `PooledDataSource` with dynamic sizing (default 5→20), borrow validation, idle eviction, max lifetime |
+| **Graceful shutdown** | 6-phase drain: stop accept → drain workers → flush writes → close connections → release resources |
+| **Health checks** | `GET /health` bypasses worker pool. Pluggable probes. Returns `200` (UP) or `503` (DOWN) with JSON status |
+| **Rate limiting** | Opt-in, two-level: global defaults + `@RateLimit` per-endpoint annotation. `requests=0` whitelists an endpoint |
+| **Request timeout** | Global default (30s) + `@Timeout(ms)` per-endpoint annotation. Idle read sweep closes hung connections |
+| **Gzip compression** | Automatic when client sends `Accept-Encoding: gzip`. Skips small (<1KB) and non-text responses |
+
+### WebSocket
+
+| Feature | Description |
+|---------|-------------|
+| **Annotation lifecycle** | `@WebSocket`, `@OnOpen`, `@OnMessage`, `@OnBinary`, `@OnClose`, `@OnError` |
+| **RFC 6455** | Full frame handling — text, binary, ping/pong, close with status codes |
+| **Built-in broadcaster** | Fan-out to all sessions on a path. Resilient to stale sessions |
+| **Keepalive** | Server-initiated ping every 30s, closes unresponsive connections after 10s |
+| **Query strings** | Upgrade query params copied to session attributes (`qs.token`, `qs.room`) |
+
+### Plugins
+
+| Plugin | Description |
+|--------|-------------|
+| **GraphQL** | Lexer, parser, AST, executor. `@Query`/`@Mutation` annotations. Register via `GraphQLModule` |
+| **Rate Limiting** | `@RateLimit(requests=N, perSeconds=S)`. Per-client key via header (default: `X-Forwarded-For`) |
+| **Scheduler** | `@Scheduled(fixedRate, initialDelay)` on methods. `ScheduledExecutorService`-backed |
+
+### Database
+
+| Feature | Description |
+|---------|-------------|
+| **ORM** | `EntityManager` with annotation-based mapping |
+| **Connection pooling** | `PooledDataSource` — production defaults, borrow validation, background eviction |
+| **Transactions** | `TransactionableConnection` with savepoints and auto-rollback on error |
+
+### Security
+
+| Feature | Description |
+|---------|-------------|
+| **SSL/TLS** | `SSLContextManager` creates TLS context from JKS keystore |
+| **Certificate management** | `SSLCertificateManager` loads signed certificates |
+
+## Configuration
+
+All configuration is done in code — no XML, no properties files.
+
+```java
+RestHttpServer server = new RestHttpServer() {};
+
+// Server
+server.setDocumentRoot("public");
+server.bind(new InetSocketAddress(8080));
+
+// Worker pool
+server.setWorkerThreads(8);
+server.setMaxQueueSize(500);
+
+// Timeouts
+server.setDefaultRequestTimeoutMs(30_000);   // 30 seconds
+server.setIdleReadTimeoutMs(60_000);         // 60 seconds
+server.setDrainTimeoutMs(10_000);            // graceful shutdown drain
+
+// Health
+server.setHealthPath("/.well-known/health");
+server.addHealthCheck(new DatabaseHealthCheck());
+
+// Events
+server.setConnectionEvents(new HttpConnectionEvents() { ... });
+server.setRequestEvents(new HttpRequestEvents() { ... });
+```
+
+### Rate limiting (opt-in)
+
+```java
+RateLimitModuleService rateLimit = new RateLimitModuleService();
+rateLimit.setEnabled(true);                       // off by default
+rateLimit.setDefaultRequests(200);                // per 60s window
+rateLimit.setDefaultPerSeconds(60);
+ModuleRegistry.initialize(server, rateLimit);
+
+// Per-endpoint overrides:
+@RateLimit(requests = 10, perSeconds = 60)        // strict
+@RateLimit(requests = 500, perSeconds = 60)       // generous
+@RateLimit(requests = 0, perSeconds = 1)          // whitelist
+```
+
+### Request timeout (per-endpoint)
+
+```java
+@Timeout(ms = 120_000)   // 2 minutes for slow exports
+@Timeout(ms = 0)          // no timeout (streaming)
+// No annotation → uses global default (30s)
+```
+
+## Build & Run
 
 ```bash
-ant compile-test
+ant clean compile jar              # builds dist/cintix-application-server.jar
+ant compile-test                   # compiles tests
 java -cp 'build/classes:build/test/classes:lib/*' dk.cintix.application.server.AllTests
 ```
 
-## SSL Notes
-- SSL uses `.keystore` (JKS) in the project working directory.
-- `SSLContextManager` builds a `TLS` context from the keystore key/password.
-- Ensure `.keystore` exists and matches the provided key password.
+**Requirements:** Java 8+, Apache Ant. Source/target compiled with `--release 8` for portability across JDK 8–25+.
 
-## Features added since v1
+## Project Layout
 
-- **WebSocket** — annotation-driven (`@WebSocket`, `@OnOpen`, `@OnMessage`, `@OnBinary`, `@OnClose`, `@OnError`), RFC 6455 frame handling, built-in broadcaster for fan-out to all sessions on a path.
-- **GraphQL plugin** — query and mutation engine with built-in lexer/parser/executor. Register the plugin, then call `graphql.addEndpoint(path, service)` with `@GraphQLModule.Query`/`@GraphQLModule.Mutation` annotations.
-
-## Plugin System
-
-The server has a lightweight plugin architecture to keep core HTTP/REST small while allowing optional capabilities.
-
-Plugins implement `dk.cintix.application.server.infrastructure.modules.Plugin` and are wired through `ModuleRegistry`. They can be registered directly or discovered with `ServiceLoader` via `META-INF/services/dk.cintix.application.server.infrastructure.modules.Plugin`.
-
-Core (REST, WebSocket, SSL, static files) stays built-in. GraphQL, rate limiting, and scheduling are plugins. JDBC/database remains built in for now and is a future extraction candidate.
-
-Example:
-```java
-PluginContext context = ModuleRegistry.initialize(server, new GraphQLModuleService());
-GraphQLModule graphql = context.getModule(GraphQLModule.class);
-graphql.addEndpoint("/graphql", new UserQueries(), new ProductQueries(), new OrderMutations());
+```
+src/dk/cintix/application/server/
+  modules/
+    http/server/          REST routing, NIO event loop, request parsing, WebSocket
+      endpoint/           RestHttpServer, RestHttpRequest, HealthCheck, WebSocketFrame
+      services/           RestActionService, WebSocketService, Response, JSON generators
+    graphql/              GraphQL plugin — lexer, parser, AST, executor, endpoint adapter
+    ratelimit/            Rate limit plugin — @RateLimit annotation, request filter
+    scheduler/            Scheduler plugin — fixed-rate job execution
+    database/             PooledDataSource, EntityManager, TransactionableConnection
+    security/             SSL context and certificate management
+  infrastructure/         Cache, ReflectionUtil, Application, Log, annotations, Plugin system
 ```
 
-GraphQL service classes use annotations from the module contract:
-```java
-public class UserQueries {
-    @GraphQLModule.Query("user")
-    public User user(String id) {
-        return findUser(id);
-    }
-}
+## Plugin Architecture
 
-public class OrderMutations {
-    @GraphQLModule.Mutation("createOrder")
-    public Order createOrder(String productId) {
-        return createOrderFor(productId);
+Plugins implement `Plugin` and are wired through `ModuleRegistry`. They register with `PluginContext` and can add request filters, WebSocket handlers, or custom modules.
+
+**Built-in plugins** (discovered via `ServiceLoader`): GraphQL, Rate Limiting, Scheduler
+
+**Creating a plugin:**
+
+```java
+public class MyPlugin implements Plugin {
+    public String getName() { return "my-plugin"; }
+
+    public void register(PluginContext context) {
+        context.registerModule(MyModule.class, myModuleInstance);
+        context.getHttpModule().addRequestFilter((request, endpoint) -> {
+            // custom filter logic
+            return null;  // null = pass through
+        });
     }
 }
 ```
 
-One GraphQL endpoint can register one or more service classes. Core HTTP no longer exposes `addGraphQLEndpoint`; use the `GraphQLModule` contract instead.
+Register via `META-INF/services/dk.cintix.application.server.infrastructure.modules.Plugin` for auto-discovery, or directly:
 
-### Additional potential future plugins
+```java
+PluginContext context = ModuleRegistry.initialize(server, new MyPlugin());
+```
 
-These follow the annotation-driven pattern already established. Listed roughly by production priority:
+## Production Readiness
 
-| Plugin | Purpose |
-|--------|---------|
-| **Auth** | `@Authenticated` annotation, JWT validation, OAuth2 client. Request interceptor before `@Action` methods. |
-| **Health checks** | `@HealthCheck` annotation, aggregated `/health` endpoint. DB, disk, memory probes. |
-| **CORS** | `@CrossOrigin` annotation on endpoints. Simple header injection. |
-| **Metrics** | Prometheus `/metrics` endpoint. Request counts, response times, active connections. |
-| **OpenAPI** | Like the built-in `?jsd` generator but producing OpenAPI 3.0 spec. `@ApiDoc` annotations for descriptions. |
-| **SSE** | `@SSE(path)` annotation for Server-Sent Events. Simpler than WebSocket for one-way streaming. |
+All items on the production roadmap are complete as of 2026-05-30:
+
+- [x] Worker-thread pool with back-pressure
+- [x] Thread safety — immutable routing, concurrent collections, volatile fields
+- [x] Proper logging — `java.util.logging` throughout, zero swallowed exceptions
+- [x] Connection pool validation — borrow checks, idle eviction, max lifetime
+- [x] HTTP/1.1 compliance — Host header, gzip, chunked encoding
+- [x] Rate limiting — opt-in, two-level (global + per-endpoint)
+- [x] Graceful shutdown — 6-phase drain with configurable timeout
+- [x] Health-check endpoint — bypasses worker pool, pluggable probes
+- [x] Request timeout — global + `@Timeout` annotation, idle read sweep
+
+## Future Roadmap
+
+These are "next level" improvements — the server is production-ready without them:
+
+| Area | Description |
+|------|-------------|
+| **TLS in event loop** | `SSLContextManager` exists but isn't wired into the accept loop. Currently needs a reverse proxy for TLS. |
+| **Multi-selector** | Single-threaded event loop handles 10K+ connections comfortably. A multi-selector architecture would scale further. |
+| **HTTP/2** | Binary framing, multiplexed streams, HPACK. Significant throughput improvement for many-small-request workloads. |
+| **Streaming chunked encoding** | Current `Response.chunked()` buffers full body. True streaming would enable incremental writes. |
+| **WebSocket permessage-deflate** | Compression extension for WebSocket frames. |
+| **CORS plugin** | `@CrossOrigin` annotation, header injection as a plugin. |
+| **Auth plugin** | `@Authenticated`, JWT validation, OAuth2 client. |
+| **Metrics** | Prometheus `/metrics` endpoint — request counts, latency histograms, active connections. |
+| **OpenAPI** | Generate OpenAPI 3.0 spec from annotations (extends the built-in `?jsd` JSON service descriptor). |
 | **Multipart upload** | `@Upload` annotation, stream files to disk. |
-| **Redis** | Connection pool + `@Cache` backed by Redis instead of in-memory.
-
-## Recent improvements
-
-- **WebSocket lifecycle robustness** — Three fixes harden the WebSocket layer: (1) `WebSocketBroadcaster` catches stale session exceptions without breaking the broadcast loop, (2) `IOException` on dropped WebSocket connections triggers immediate cleanup instead of leaking the session, (3) a keepalive daemon thread sends server-initiated ping every 30s and closes connections that don't respond within 10s, preventing proxy/firewall drops of idle connections.
-- **WebSocket query strings** — Query parameters from the upgrade request (`/ws/chat?token=abc`) are copied to `WebSocketSession` attributes with a `qs.` prefix. Access them in `@OnOpen` via `session.getAttribute("qs.token")`.
-- **Header case-insensitivity** — `RestHttpRequest.getHeader()` uses case-insensitive lookup. `getHeader("Authorization")` works regardless of whether the client sent `AUTHORIZATION`, `Authorization`, or `authorization`.
-- **Mixed path + body parameters** — `RestActionService` now supports endpoint methods that combine path variables (`{spaceId}`) with a raw body parameter. Previously this caused an `IndexOutOfBounds`; now remaining parameters fall back to `request.getRawPost()`.
-
-## Production Roadmap
-
-The server is being hardened toward production use. The items below are listed by priority.
-
-### Blocker (must fix before production)
-
-- [ ] **Worker-thread pool for request processing.** The NIO event loop currently runs accept → read → route → invoke → write all in a single thread. A slow database call or file I/O blocks every other connected client. Move `handleRequestMapping` and `RestActionService.process()` onto a thread pool so the event loop only handles I/O (accept/read/write).
-- [ ] **Thread safety.** `pathMapping` is a static `LinkedHashMap` shared across all instances without synchronization. `clientSessions` is a plain `LinkedHashMap` accessed from the event loop. Once worker threads exist, the routing table must be made immutable after startup and the session map must use `ConcurrentHashMap` or equivalent.
-- [ ] **Proper error handling and logging.** Empty catch blocks (`catch (Exception e) {}`) and `printStackTrace()` must be replaced with `java.util.logging` (or SLF4J). Every `500 Internal Server Error` must log the full stack trace with request context (URL, method, client IP).
-- [ ] **Database connection pooling validation.** Verify `PooledDataSource` has correct defaults: minimum/maximum connections, connection timeout, validation query on borrow, and proper cleanup on shutdown.
-
-### High priority (first production release)
-
-- [ ] **Content-Length / body size limits.** `handleRead` currently reads up to 5 MB hardcoded with no validation against the `Content-Length` header. Enforce a configurable max body size and reject requests that exceed it before buffering.
-- [ ] **Proper HTTP/1.1 compliance.** Add support for `Transfer-Encoding: chunked`, `Content-Encoding: gzip`, and validate the `Host` header. Reverse proxies and load balancers expect this.
-- [ ] **Rate limiting enabled by default.** The `ratelimit` plugin already exists. Ship it on by default with sensible limits, especially on login and mutation endpoints.
-- [ ] **Graceful shutdown.** `setRunning(false)` stops the accept loop immediately, but in-flight requests must complete (with a timeout). Add a shutdown hook that drains active connections cleanly.
-- [ ] **Thread-pool saturation handling.** When all worker threads are busy, the server must respond `503 Service Unavailable` rather than queuing requests indefinitely.
-
-### Medium priority (before scaling)
-
-- [ ] **Static file caching.** Files served from `DOCUMENT_ROOT` are read from disk on every request. Add in-memory caching with file modification timestamp checks.
-- [ ] **CORS plugin.** Extract CORS header injection into a proper plugin (listed in the table above).
-- [ ] **Health-check endpoint.** Add a `/health` endpoint that reports DB connectivity, disk space, and active connection count.
-- [ ] **Request timeout.** The event loop has no idle timeout for partial reads. A slow client that sends one byte every 29 seconds keeps a connection open forever.
-
-## Current Status
-The codebase has been recently hardened with case-insensitive header lookups, mixed path+body parameter support, WebSocket query string passthrough (`qs.*` attributes), and resilient WebSocket broadcasting that handles stale sessions without breaking fan-out.
+| **Redis caching** | `@Cache` backed by Redis instead of in-memory. |

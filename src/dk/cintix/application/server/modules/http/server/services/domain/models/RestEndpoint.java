@@ -3,6 +3,8 @@ package dk.cintix.application.server.modules.http.server.services.domain.models;
 import dk.cintix.application.server.infrastructure.annotations.Inject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -10,6 +12,7 @@ import java.lang.reflect.Method;
  */
 public class RestEndpoint {
 
+    private static final Logger logger = Logger.getLogger(RestEndpoint.class.getName());
     private final String path;
     private final Method method;
     private final Object object;
@@ -44,7 +47,7 @@ public class RestEndpoint {
                 }
             }
         } catch (Exception exception) {
-            exception.printStackTrace();
+            logger.log(Level.WARNING, "Failed to inject dependency into endpoint: " + path, exception);
         }
     }
 

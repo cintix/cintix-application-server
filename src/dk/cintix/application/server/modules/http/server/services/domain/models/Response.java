@@ -34,6 +34,7 @@ public class Response {
     private Map<String, String> header = new LinkedHashMap<>();
     private byte[] content = new byte[0];
     private String contentType = "application/json";
+    private boolean useChunkedEncoding;
 
     static {
         contextGenerators.put("application/json", new JSONGenerator());
@@ -46,6 +47,18 @@ public class Response {
 
     public int getStatus() {
         return status;
+    }
+
+    public byte[] getContent() {
+        return content;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public boolean isChunked() {
+        return useChunkedEncoding;
     }
 
     public static Map<String, ModelGenerator> getContextGenerators() {
@@ -107,6 +120,11 @@ public class Response {
         return this;
     }
 
+    public Response RequestTimeout() {
+        status = 408;
+        return this;
+    }
+
     public Response TooManyRequests() {
         status = Status.TooManyRequests.getValue();
         return this;
@@ -159,6 +177,16 @@ public class Response {
 
     public Response ContentType(String content) {
         contentType = content;
+        return this;
+    }
+
+    /**
+     * Enables chunked transfer encoding for this response.
+     * When enabled, Content-Length is omitted and the body is sent
+     * as a series of sized chunks terminated by a zero-length chunk.
+     */
+    public Response chunked() {
+        useChunkedEncoding = true;
         return this;
     }
 
@@ -231,12 +259,27 @@ public class Response {
             response += "Connection: Closed\r\n";
         }
 
-        response += "Content-Length: " + content.length + "\r\n";
-        response += "\r\n";
+        if (useChunkedEncoding) {
+            response += "Transfer-Encoding: chunked\r\n";
+            response += "\r\n";
+            outputStream.writeBytes(response.getBytes());
+            // Write body in chunked format
+            if (content.length > 0) {
+                String chunkSize = Integer.toHexString(content.length) + "\r\n";
+                outputStream.writeBytes(chunkSize.getBytes());
+                outputStream.writeBytes(content);
+                outputStream.writeBytes("\r\n".getBytes());
+            }
+            // Terminating chunk
+            outputStream.writeBytes("0\r\n\r\n".getBytes());
+        } else {
+            response += "Content-Length: " + content.length + "\r\n";
+            response += "\r\n";
 
-        outputStream.writeBytes(response.getBytes());
-        if (content.length > 0) {
-            outputStream.writeBytes(content);
+            outputStream.writeBytes(response.getBytes());
+            if (content.length > 0) {
+                outputStream.writeBytes(content);
+            }
         }
         return outputStream.toByteArray();
     }
@@ -272,6 +315,9 @@ public class Response {
         }
         if (code == 404) {
             return "Not Found";
+        }
+        if (code == 408) {
+            return "Request Timeout";
         }
         if (code == 429) {
             return "Too Many Requests";

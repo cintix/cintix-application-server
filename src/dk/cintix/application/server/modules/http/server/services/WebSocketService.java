@@ -22,6 +22,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Handles WebSocket upgrade, frame dispatch, and lifecycle.
@@ -30,6 +32,7 @@ import java.util.Map;
  */
 public class WebSocketService {
 
+    private static final Logger logger = Logger.getLogger(WebSocketService.class.getName());
     private final Map<String, HandlerEntry> handlers = new LinkedHashMap<>();
     private final WebSocketBroadcaster broadcaster = new WebSocketBroadcaster();
     private final Map<String, ConnectionInfo> connections = new LinkedHashMap<>();
@@ -240,7 +243,7 @@ public class WebSocketService {
             }
             method.invoke(handler, args);
         } catch (IllegalAccessException | InvocationTargetException e) {
-            e.printStackTrace();
+            logger.log(Level.WARNING, "Failed to invoke WebSocket handler method: " + method.getName(), e);
         }
     }
 
@@ -249,6 +252,7 @@ public class WebSocketService {
             try {
                 Thread.sleep(30_000);
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 break;
             }
 
@@ -288,6 +292,7 @@ public class WebSocketService {
                     info.key.cancel();
                     info.channel.close();
                 } catch (IOException ignored) {
+                    logger.log(Level.FINE, "IOException closing stale WebSocket channel", ignored);
                 }
             }
         }

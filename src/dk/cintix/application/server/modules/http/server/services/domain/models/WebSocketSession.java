@@ -1,7 +1,7 @@
 package dk.cintix.application.server.modules.http.server.services.domain.models;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Public session object for WebSocket connections.
@@ -12,8 +12,8 @@ public class WebSocketSession {
 
     private final String id;
     private final String remoteAddress;
-    private final Map<String, Object> attributes = new LinkedHashMap<>();
-    private boolean open = true;
+    private final Map<String, Object> attributes = new ConcurrentHashMap<>();
+    private volatile boolean open = true;
     private SocketChannelWriter writer;
 
     public WebSocketSession(String id, String remoteAddress) {

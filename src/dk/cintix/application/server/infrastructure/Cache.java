@@ -105,8 +105,10 @@ public class Cache<K, T> {
      * @return
      */
     public boolean contains(K key) {
-        cleanup();
-        return cacheMap.containsKey(key);
+        synchronized (cacheMap) {
+            cleanup();
+            return cacheMap.containsKey(key);
+        }
     }
 
     /**

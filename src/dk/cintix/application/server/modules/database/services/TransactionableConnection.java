@@ -3,6 +3,8 @@ package dk.cintix.application.server.modules.database.services;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -10,6 +12,7 @@ import java.sql.Statement;
  */
 public class TransactionableConnection implements AutoCloseable {
 
+    private static final Logger logger = Logger.getLogger(TransactionableConnection.class.getName());
     private boolean inErrorState;
     private int savepointer = 0;
 
@@ -148,6 +151,7 @@ public class TransactionableConnection implements AutoCloseable {
                 connection.close();
             }
         } catch (SQLException sQLException) {
+            logger.log(Level.WARNING, "Failed to close connection during finalize", sQLException);
         }
         super.finalize();
     }

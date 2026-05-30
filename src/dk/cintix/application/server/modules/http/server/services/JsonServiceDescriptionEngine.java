@@ -2,6 +2,8 @@ package dk.cintix.application.server.modules.http.server.services;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import dk.cintix.application.server.infrastructure.ReflectionUtil;
 import dk.cintix.application.server.infrastructure.Status;
 import dk.cintix.application.server.infrastructure.annotations.Action;
@@ -24,6 +26,8 @@ import java.lang.reflect.Parameter;
  * @author cix
  */
 public class JsonServiceDescriptionEngine {
+
+    private static final Logger logger = Logger.getLogger(JsonServiceDescriptionEngine.class.getName());
 
     /**
      *
@@ -132,7 +136,7 @@ public class JsonServiceDescriptionEngine {
             definition.setModel(modelDefinition);
             return definition;
         } catch (Exception ex) {
-            ex.printStackTrace();
+            logger.log(Level.WARNING, "Failed to generate service definition", ex);
         }
         return null;
     }

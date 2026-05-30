@@ -229,6 +229,7 @@ public class HTTPRestClient {
                     try {
                         isr = new InputStreamReader(urlConnection.getErrorStream());
                     } catch (Exception e) {
+                        logger.log(Level.FINE, "Could not read error stream from connection", e);
                     }
                 }
             }

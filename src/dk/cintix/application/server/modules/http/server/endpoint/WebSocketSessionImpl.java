@@ -19,7 +19,7 @@ public class WebSocketSessionImpl implements WebSocketSession.SocketChannelWrite
     private final SelectionKey key;
     private final WebSocketSession session;
     private final List<byte[]> outgoingFrames = new ArrayList<>();
-    private boolean closeFrameSent;
+    private volatile boolean closeFrameSent;
 
     public WebSocketSessionImpl(SocketChannel channel, SelectionKey key, WebSocketSession session) {
         this.channel = channel;

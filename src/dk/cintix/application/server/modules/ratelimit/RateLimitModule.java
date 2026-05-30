@@ -16,8 +16,14 @@ public interface RateLimitModule extends Plugin {
     @Retention(RetentionPolicy.RUNTIME)
     @Target({ElementType.METHOD, ElementType.TYPE})
     public static @interface RateLimit {
+        /**
+         * Maximum number of requests allowed in the window.
+         * Use 0 to disable rate limiting for this endpoint (whitelist).
+         */
         int requests();
+        /** Window size in seconds. */
         int perSeconds();
+        /** Header used to identify the client (default: X-Forwarded-For). */
         String keyHeader() default "X-Forwarded-For";
     }
 }

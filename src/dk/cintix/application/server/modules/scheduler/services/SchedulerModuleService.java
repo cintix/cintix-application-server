@@ -6,6 +6,8 @@ import java.lang.reflect.Method;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Facade service for the scheduler plugin.
@@ -13,6 +15,8 @@ import java.util.concurrent.TimeUnit;
  * @author cix
  */
 public class SchedulerModuleService implements SchedulerModule {
+
+    private static final Logger logger = Logger.getLogger(SchedulerModuleService.class.getName());
     private final ScheduledExecutorService executor;
 
     public SchedulerModuleService() {
@@ -66,7 +70,7 @@ public class SchedulerModuleService implements SchedulerModule {
                 try {
                     method.invoke(job);
                 } catch (Exception exception) {
-                    exception.printStackTrace();
+                    logger.log(Level.SEVERE, "Scheduled job invocation failed: " + method.getName(), exception);
                 }
             }
         }, scheduled.initialDelaySeconds(), scheduled.fixedRateSeconds(), TimeUnit.SECONDS);

@@ -147,7 +147,7 @@ public class GraphQLEndpointTest {
     private Response handle(RestHttpServer server, RestHttpRequest request) throws Exception {
         Field pathMappingField = RestHttpServer.class.getDeclaredField("pathMapping");
         pathMappingField.setAccessible(true);
-        Map<String, Map<String, RestEndpoint>> pathMapping = (Map<String, Map<String, RestEndpoint>>) pathMappingField.get(null);
+        Map<String, Map<String, RestEndpoint>> pathMapping = (Map<String, Map<String, RestEndpoint>>) pathMappingField.get(server);
 
         Method handleRequestMapping = RestHttpServer.class.getDeclaredMethod("handleRequestMapping", Map.class, RestHttpRequest.class);
         handleRequestMapping.setAccessible(true);

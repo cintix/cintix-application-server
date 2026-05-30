@@ -3,6 +3,8 @@ package dk.cintix.application.server.infrastructure;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.text.SimpleDateFormat;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -10,13 +12,15 @@ import java.text.SimpleDateFormat;
  */
 public class ReflectionUtil {
 
-    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("YYYY-MM-dd");
+    private static final Logger logger = Logger.getLogger(ReflectionUtil.class.getName());
+    private static final ThreadLocal<SimpleDateFormat> dateFormat = ThreadLocal.withInitial(() -> new SimpleDateFormat("YYYY-MM-dd"));
 
     public static Method getBestDescribedMethod(Method method, Object clz) {
         if (!method.getDeclaringClass().getSimpleName().equalsIgnoreCase("Object") && !method.getDeclaringClass().equals(clz.getClass())) {
             try {
                 return method.getDeclaringClass().getMethod(method.getName(), method.getParameterTypes());
             } catch (NoSuchMethodException | SecurityException securityException) {
+                logger.log(Level.FINER, "Method not found on declaring class: " + method.getName(), securityException);
             }
         }
         Class<?>[] interfaces = method.getDeclaringClass().getInterfaces();
@@ -24,6 +28,7 @@ public class ReflectionUtil {
             try {
                 return cl.getMethod(method.getName(), method.getParameterTypes());
             } catch (Exception ex) {
+                logger.log(Level.FINER, "Method not found on interface: " + method.getName(), ex);
             }
         }
         return method;
@@ -35,7 +40,7 @@ public class ReflectionUtil {
             case "java.lang.String":
                 return value;
             case "java.util.Date":
-                return dateFormat.parse(value);
+                return dateFormat.get().parse(value);
             case "int":
             case "java.lang.Integer":
                 return Integer.parseInt(value);

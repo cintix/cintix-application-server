@@ -1,8 +1,8 @@
 package dk.cintix.application.server.infrastructure;
 
 import java.io.File;
-import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  *
@@ -10,7 +10,7 @@ import java.util.Map;
  */
 public class Application {
 
-    private static final Map<String, String> _CONTEXT_MAP = new LinkedHashMap<>();
+    private static final Map<String, String> _CONTEXT_MAP = new ConcurrentHashMap<>();
 
     /**
      *
@@ -18,7 +18,11 @@ public class Application {
      * @param value
      */
     public static void set(String key, String value) {
-        _CONTEXT_MAP.put(key, value);
+        if (value == null) {
+            _CONTEXT_MAP.remove(key);
+        } else {
+            _CONTEXT_MAP.put(key, value);
+        }
     }
 
     /**
@@ -27,10 +31,10 @@ public class Application {
      * @return
      */
     public static String get(String key) {
-        if (_CONTEXT_MAP.containsKey(key)) {
-            return _CONTEXT_MAP.get(key);
+        if (key == null) {
+            return null;
         }
-        return null;
+        return _CONTEXT_MAP.get(key);
     }
 
     /**

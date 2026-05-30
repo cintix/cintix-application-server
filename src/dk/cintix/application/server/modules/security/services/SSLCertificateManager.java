@@ -3,6 +3,8 @@ package dk.cintix.application.server.modules.security.services;
 import java.io.File;
 import java.io.FileInputStream;
 import java.security.KeyStore;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -10,6 +12,7 @@ import java.security.KeyStore;
  */
 public class SSLCertificateManager {
 
+    private static final Logger logger = Logger.getLogger(SSLCertificateManager.class.getName());
     private KeyStore keyStore;
     private final int keysize = 1024 * 2;
 
@@ -18,6 +21,7 @@ public class SSLCertificateManager {
             keyStore = KeyStore.getInstance("JKS");
             keyStore.load(null, null);
         } catch (Exception ex) {
+            logger.log(Level.WARNING, "Failed to initialize default KeyStore", ex);
         }
     }
 
@@ -36,7 +40,7 @@ public class SSLCertificateManager {
             keyStore.load(inputStream, key.toCharArray());
             return keyStore;
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.log(Level.SEVERE, "Failed to load keystore from file", e);
         }
         return null;
     }

@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Release Process
+
+```bash
+./release.sh              # interactive: prompts for major/minor/bugfix + description
+./release.sh minor "description"   # non-interactive
+```
+
+The script: (1) bumps the version in `.releases`, (2) builds the fat jar, (3) git tags, (4) pushes, (5) creates a GitHub release with `gh`. See `.releases` for version history.
+
 ## Build & Test Commands
 
 Apache Ant from repo root:
@@ -160,6 +169,105 @@ Loaded via `java.util.ServiceLoader` in `ModuleRegistry.loadPlugins(httpModule)`
 
 ## Recent Changes
 
+### Request timeout (2026-05-30)
+
+Implemented two-level request timeout:
+
+- **System-wide default** (30s): configured via `setDefaultRequestTimeoutMs(int ms)`. Checked in `WorkerTask.run()` before processing — if `elapsed > timeout`, returns `408 Request Timeout` immediately without invoking the endpoint. Use `setDefaultRequestTimeoutMs(0)` to disable globally.
+- **Per-endpoint `@Timeout` annotation**: `@Timeout(ms = 120_000)` on a method or class overrides the global default. `@Timeout(ms = 0)` disables timeout for that endpoint (e.g. CSV exports, streaming). The annotation is checked against exact path match and regex patterns, same as `@RateLimit`.
+- **Idle read timeout** (60s): `sweepIdleConnections()` runs every 30s in the event loop, iterating `selector.keys()` and closing connections that haven't completed their HTTP read within `idleReadTimeoutMs` (configurable via `setIdleReadTimeoutMs()`). WebSocket connections are skipped.
+- Added `Response.RequestTimeout()` and `408 Request Timeout` to `messageFromStatus()`.
+
+### Health-check endpoint (2026-05-30)
+
+Added a built-in `GET /health` endpoint that bypasses the worker pool entirely:
+
+- **Event loop inline**: health checks run directly on the NIO event loop — they respond even when all worker threads are saturated. The `handleRead()` method detects `/health` requests and calls `executeHealthCheck()` before reaching the `workerPool.submit()` path.
+- **Pluggable probes**: register health checks via `server.addHealthCheck(new HealthCheck() { ... })`. Each probe returns `"UP"` or an error message. The built-in uptime probe is always included.
+- **JSON response**: `{"status":"UP","database":"UP","uptime":"5m"}` with 200 OK when all probes pass. `{"status":"DOWN","redis":"Connection refused","uptime":"5m"}` with 503 when any probe fails.
+- **Configurable**: `setHealthPath(String path)` changes the health endpoint path (default `/health`).
+
+### Graceful shutdown (2026-05-30)
+
+Implemented a six-phase graceful shutdown triggered when `setRunning(false)` is called:
+
+1. **Stop accepting**: cancel the `ServerSocketChannel` selection key — no new TCP connections
+2. **Drain worker pool**: `workerPool.shutdown()` + `awaitTermination(drainTimeoutMs)` — let in-flight workers complete
+3. **Process completed tasks**: drain the `completionQueue` one final time
+4. **Drain pending writes**: short `select(100ms)` loop processes `OP_READ` and `OP_WRITE` for remaining connections. During drain, `shouldKeepAlive()` returns false so all responses get `Connection: close`.
+5. **Force-close remaining**: after drain timeout, any remaining connections are forcibly closed. Logged at WARNING level.
+6. **Close resources**: `selector.close()` + `serverSocketChannel.close()`
+
+Configurable via `setDrainTimeoutMs(int ms)` (default 10s). Full lifecycle logged at INFO/WARNING levels.
+
+### Rate limiting (2026-05-30)
+
+Enhanced the existing `ratelimit` plugin from annotation-only to two-level:
+
+- **Global default** (off by default): `rateLimitModule.setEnabled(true)` enables a global rate limit (default 100 req/60s). Configure via `setDefaultRequests()`, `setDefaultPerSeconds()`, `setDefaultKeyHeader()`.
+- **Per-endpoint override**: `@RateLimit(requests=N, perSeconds=S)` overrides the global setting for that endpoint. Stricter (`requests=10`), more lenient (`requests=500`), or `requests=0` to whitelist (no limit).
+- **Memory leak fix**: background daemon thread (`rate-limit-cleanup`) periodically removes expired windows. Aggressive sweep triggers at 10K+ windows.
+- **Shutdown**: `shutdown()` stops the cleanup thread and clears all windows.
+- **Backwards compatible**: without `setEnabled(true)` or `@RateLimit` annotation, no rate limiting occurs.
+
+### HTTP/1.1 compliance (2026-05-30)
+
+Implemented three HTTP/1.1 requirements:
+
+- **Host header validation** (RFC 7230 §5.4): Requests without a `Host` header get a `400 Bad Request` response. Checked inline in the event loop before worker dispatch (fast path).
+- **Gzip compression**: Transparent response compression when client sends `Accept-Encoding: gzip`. Applied in `handleWrite()` — compresses the body, sets `Content-Encoding: gzip`. Skips responses <1KB, chunked responses, and non-compressible content types. Added `Response.getContent()`, `getContentType()`, `isChunked()` to support the compression logic.
+- **Chunked transfer encoding**: `Response.chunked()` method enables `Transfer-Encoding: chunked`. The `build()` method formats the body as sized hex chunks terminated by `0\r\n\r\n`. Chunked responses omit `Content-Length`. Gzip is skipped for chunked responses.
+
+`handleRead()` now also stores `Accept-Encoding` on the client session (alongside `Connection`). `processCompletedTasks()` preserves it when creating the write session.
+
+### Connection pool validation (2026-05-30)
+
+`PooledDataSource` rewritten for production use:
+
+- **Sizing**: configurable `initialPoolSize` (default 5) and `maxPoolSize` (default 20). Pool grows on demand up to max.
+- **Borrow with timeout**: `getConnection()` blocks up to `connectionTimeoutMs` (default 30s) when pool is exhausted, using `wait()/notifyAll()`. Throws `SQLException` on timeout.
+- **Validation on borrow**: each connection is validated with `Connection.isValid(validationTimeoutSec)` (default 3s) before being handed out. Invalid connections are closed and the next idle connection is tried.
+- **Idle eviction**: background daemon thread (`pool-evictor`) runs at `evictionIntervalMs` (default 1 min). Idle connections above `initialPoolSize` are trimmed. Connections exceeding `maxLifetimeMs` (default 30 min) are recycled.
+- **Graceful shutdown**: `shutdown()` closes all idle and active connections, stops the eviction thread, and wakes any waiting borrowers.
+- **Instance-based config**: all settings are per-instance (no more static `timeout` / `executorPoolSize` / `validSocketTimeOut`). Removed unused `executorService`.
+- **Thread safety**: `synchronized` on `this` for all pool mutations, with `notifyAll()` on release/shutdown. Connection creation and closing happen outside the lock where possible.
+
+### Proper logging (2026-05-30)
+
+Replaced all `printStackTrace()` calls and empty catch blocks with `java.util.logging`. Every class now has a `private static final Logger logger`. Log levels used:
+
+- **SEVERE**: Request processing failures, SSL context creation failures, connection pool failures, scheduled job failures
+- **WARNING**: Dependency injection failures, service definition generation failures, WebSocket handler invocation failures, SSL keystore initialization failures, DB connection close failures, log file write failures (fallback)
+- **FINE/FINER**: Expected/benign failures (reflection method resolution, stale channel cleanup, cancelled key races, missing GraphQL fields)
+
+`Log.appendToLog()` is now `synchronized` and uses `java.util.logging` as a fallback when its own file output fails. All `InterruptedException` catches restore the interrupt flag.
+
+### Thread safety (2026-05-30)
+
+Audited and fixed all shared mutable state across the event loop thread, worker pool threads, and WebSocket keepalive thread. Key changes:
+
+- **`RestHttpServer`**: `pathMapping` frozen into immutable `frozenPathMapping` at startup. `clientSessions` → `ConcurrentHashMap`. `documentationEndpoint` → `ConcurrentHashMap`. `requestFilters` → `CopyOnWriteArrayList`. Fixed `WorkerTask` to attach its session to the `SelectionKey` before waking the selector (missing `key.attach()` was causing all responses to be 500).
+- **`RestActionService._CACHE_MAPS`**: `LinkedHashMap` → `ConcurrentHashMap` (read/written by all worker threads).
+- **`Application._CONTEXT_MAP`**: `LinkedHashMap` → `ConcurrentHashMap`. `set()` now removes on null value (CHM rejects nulls); `get()` guards against null keys.
+- **`ReflectionUtil`**: `static SimpleDateFormat` → `ThreadLocal<SimpleDateFormat>` (not thread-safe).
+- **`Log`**: Double-checked locking singleton. `ThreadLocal<SimpleDateFormat>`. `appendToLog()` synchronized for safe `FileOutputStream` writes.
+- **`Cache.contains()`**: Wrapped `cleanup()` + `containsKey()` in `synchronized(cacheMap)` (was calling `containsKey()` outside the lock).
+- **`WebSocketSession`**: `open` → `volatile` (read by keepalive + event loop). `attributes` → `ConcurrentHashMap`.
+- **`WebSocketSessionImpl`**: `closeFrameSent` → `volatile` (written in `enqueueClose()`, read in `isCloseFrameSent()` without the `outgoingFrames` lock).
+
+### Worker-thread pool (2026-05-30)
+
+The NIO event loop no longer processes requests inline. Endpoint dispatch (`handleRequestMapping` + `RestActionService.process()`) now runs on a configurable thread pool so slow endpoints don't block other clients.
+
+**Architecture:**
+- **`WorkerTask` inner class** — wraps `handleRequestMapping` call. Runs on a `ThreadPoolExecutor`. Stores the `Response` on `InternalClientSession`, then enqueues the `SelectionKey` into `completionQueue` and calls `selector.wakeup()`.
+- **`processCompletedTasks()`** — called at the top of each event loop iteration. Drains `completionQueue`, validates each key, attaches the write session, and sets `interestOps(OP_WRITE)`.
+- **`handleRead`** — after parsing the HTTP request, sets `key.interestOps(0)` to suppress further reads, creates a fresh `InternalClientSession`, and submits a `WorkerTask`. On `RejectedExecutionException` (queue full), returns `503 Service Unavailable` immediately.
+- **Back-pressure** — `ThreadPoolExecutor` with bounded `LinkedBlockingQueue` and `AbortPolicy`. Default pool size: `max(4, availableProcessors * 2)`, max queue: 1000.
+- **Shutdown** — `workerPool.shutdown()` + `awaitTermination(5s)` + `shutdownNow()` + final `processCompletedTasks()` drain.
+- **Thread safety** — workers never touch `SocketChannel` or `SelectionKey` mutators. `ConcurrentLinkedQueue` provides happens-before between worker write and event loop read. `selector.wakeup()` is thread-safe per NIO spec.
+- **Health bypass** — `GET /health` runs inline on the event loop (before `workerPool.submit()`), responding even when all workers are saturated. Pluggable health probes via `addHealthCheck()`.
+
 ### NIO event loop keep-alive and connection handling fix (2026-05-28)
 
 Four fixes that together enable HTTP/1.1 keep-alive and fix connection handling bugs:
@@ -190,24 +298,28 @@ The project goal is moving from hobby project to production use — the author i
 
 ### Known architecture limitations
 
-- **Single-threaded event loop.** The NIO event loop in `startServer()` runs accept → read → route-match → action-invoke → write on one thread. A slow database query or file I/O in an endpoint blocks every other connected client. Fixing this requires a worker-thread pool (see roadmap in README.md).
-- **No thread safety.** `pathMapping` is a static `LinkedHashMap` shared across instances with no synchronization. `clientSessions` is a plain `LinkedHashMap`. Once worker threads are introduced, the routing table must be immutable after startup and session state must use concurrent data structures.
-- **Swallowed exceptions.** Several catch blocks are empty (`catch (Exception e) {}`). Replace all of them with proper logging. When the event loop catches an exception, the key that was being processed has already been removed from the selected-keys set — any exception that prevents re-registration or disconnect leaves the client hanging.
-- **No graceful shutdown.** `setRunning(false)` stops the accept loop immediately. In-flight requests are abandoned. A production server needs a drain period with a timeout.
+All critical production issues from the roadmap have been addressed. Remaining areas for future work:
+
+- **Single-threaded NIO event loop** — the selector loop is single-threaded by design. Under extreme connection volume (10K+ concurrent), `selector.select()` and key iteration can become a bottleneck. A multi-selector architecture (one accept selector + N read/write selectors) would scale further.
+- **No built-in TLS** — `SSLContextManager` can create an `SSLContext` but it's not wired into the accept loop. TLS termination currently requires a reverse proxy (nginx, haproxy). Could be added as an `SSLEngine` wrapper around `SocketChannel`.
+- **Chunked encoding is buffered** — `Response.chunked()` works but the full response body is built in memory before sending. True streaming (incremental chunk writes) would require changes to the `Response` → `handleWrite` pipeline.
+- **No HTTP/2** — HTTP/1.1 only. HTTP/2 requires a binary framing layer, multiplexed streams, and header compression (HPACK). This is a major undertaking but would bring significant performance benefits for many-small-request workloads.
+- **No WebSocket permessage-deflate** — the WebSocket implementation doesn't support the compression extension. Most production WebSocket deployments use it.
+- **`pathMapping` is instance-based** — each `RestHttpServer` instance now has its own routing table (changed from static to instance field 2026-05-30). Multiple servers with different endpoints can coexist in the same JVM.
 
 ### Production roadmap (see README.md for full checklist)
 
 The prioritized path to production, in order:
 
-1. **Worker-thread pool** — move `handleRequestMapping` + `restAction.process()` off the event loop
-2. **Thread safety** — immutable routing table after startup, `ConcurrentHashMap` for sessions
-3. **Proper logging** — replace `printStackTrace()` / empty catch blocks with `java.util.logging`
-4. **Connection pool validation** — verify `PooledDataSource` defaults
-5. **HTTP/1.1 compliance** — chunked encoding, gzip, Host header validation
-6. **Rate limiting by default** — the `ratelimit` plugin exists, ship it on
-7. **Graceful shutdown** — drain in-flight requests with a timeout
-8. **Health-check endpoint** — `/health` with DB, disk, connection probes
-9. **Request timeout** — idle timeout for partial reads
+1. ~~**Worker-thread pool**~~ — done 2026-05-30. `handleRequestMapping` + `restAction.process()` now run on a configurable `ThreadPoolExecutor`.
+2. ~~**Thread safety**~~ — done 2026-05-30. Routing table frozen at startup via `freezePathMapping()`. `ConcurrentHashMap` for `clientSessions`, `documentationEndpoint`, `Application._CONTEXT_MAP`, `RestActionService._CACHE_MAPS`. `CopyOnWriteArrayList` for `requestFilters`. `ThreadLocal<SimpleDateFormat>` in `ReflectionUtil` and `Log`. `volatile` for `WebSocketSession.open` and `WebSocketSessionImpl.closeFrameSent`. Synchronized `Log.appendToLog()` and `Cache.contains()`.
+3. ~~**Proper logging**~~ — done 2026-05-30. All 11 `printStackTrace()` calls replaced with `logger.log(Level, msg, exception)`. All 12 empty/silent catch blocks replaced with proper log statements at appropriate levels. `Log` class uses `java.util.logging` as fallback for its own internal failures.
+4. ~~**Connection pool validation**~~ — done 2026-05-30. `PooledDataSource` rewritten with production defaults: configurable min/max pool size (default 5/20), blocking borrow with 30s timeout, per-borrow connection validation with `isValid()`, background idle eviction thread, max connection lifetime enforcement, graceful shutdown. Static configuration fields moved to per-instance. Removed unused `executorService`.
+5. ~~**HTTP/1.1 compliance**~~ — done 2026-05-30. Host header validation (400 if missing per RFC 7230 §5.4), gzip response compression (opt-in via `Accept-Encoding: gzip`, skips small <1KB responses and non-text content types), chunked transfer encoding (`Response.chunked()`), `Content-Encoding: gzip` and `Transfer-Encoding: chunked` headers.
+6. ~~**Rate limiting**~~ — done 2026-05-30. Rate limiting is opt-in with two-level configuration: (1) global defaults via `rateLimitModule.setEnabled(true)` + `setDefaultRequests()`/`setDefaultPerSeconds()`, (2) per-endpoint overrides via `@RateLimit(requests=N, perSeconds=S)` annotation. Use `@RateLimit(requests=0)` to whitelist an endpoint. Background cleanup thread prevents memory leaks. Fully backwards-compatible — no annotation, no rate limit.
+7. ~~**Graceful shutdown**~~ — done 2026-05-30. Six-phase shutdown: (1) stop accepting, (2) drain worker pool with configurable timeout, (3) process remaining completed tasks, (4) drain pending writes with short select loop, (5) force-close remaining connections after timeout, (6) close selector and server socket. During drain, `Connection: keep-alive` is suppressed so clients know to disconnect. Configurable via `setDrainTimeoutMs()` (default 10s).
+8. ~~**Health-check endpoint**~~ — done 2026-05-30. `GET /health` runs inline on the NIO event loop, bypassing the worker pool entirely (responds even when all workers are saturated). Returns JSON: `{"status":"UP","database":"UP","disk":"UP","uptime":"5m"}` (200 OK) or `{"status":"DOWN",...,"redis":"Connection refused"}` (503). Pluggable via `addHealthCheck(HealthCheck)`. Configurable path via `setHealthPath()`. Built-in uptime always reported.
+9. ~~**Request timeout**~~ — done 2026-05-30. Two-level timeout: (1) global `defaultRequestTimeoutMs` (default 30s) checked in `WorkerTask.run()` before processing — if the request spent too long in the queue or the endpoint took too long, returns `408 Request Timeout`. (2) per-endpoint `@Timeout(ms = N)` annotation overrides the global timeout — use `ms = 0` to disable timeout for long-running endpoints (CSV exports, streams). (3) idle read timeout: `sweepIdleConnections()` runs every 30s in the event loop, closing connections that haven't sent data within `idleReadTimeoutMs` (default 60s). Added `Response.RequestTimeout()` and 408 status message.
 
 ### Guidelines for production work
 

@@ -5,8 +5,12 @@ import dk.cintix.application.server.modules.graphql.services.domain.registry.Gra
 
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Executor {
+
+    private static final Logger logger = Logger.getLogger(Executor.class.getName());
 
     private final GraphQLRegistry registry;
 
@@ -81,7 +85,7 @@ public class Executor {
                 Object val = f.get(obj);
                 map.put(sel.getName(), projectSubSelection(val, sel.getSubSelections()));
             } catch (NoSuchFieldException | IllegalAccessException e) {
-                // ignore missing fields
+                logger.log(Level.FINE, "Skipping missing or inaccessible field: " + sel.getName(), e);
             }
         }
         return map;

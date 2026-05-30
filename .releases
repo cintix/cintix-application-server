@@ -1,0 +1,8 @@
+# Cintix Application Server — Release History
+# Format: VERSION | DATE | TYPE | DESCRIPTION
+1.5.0 | 2026-05-30 | minor | Production hardening: worker-thread pool, thread safety, proper logging, connection pool validation, HTTP/1.1 compliance, rate limiting (opt-in), graceful shutdown, health-check endpoint, request timeout
+1.4.0 | 2026-05-28 | minor | NIO keep-alive, partial write handling, WebSocket lifecycle robustness (broadcaster resilience, keepalive ping/pong, IOException cleanup), removed InputStream.available()
+1.3.0 | 2026-05-27 | minor | WebSocket support — annotation-driven (@WebSocket, @OnOpen, @OnMessage, @OnBinary, @OnClose, @OnError), RFC 6455 frame handling, built-in broadcaster, query string passthrough
+1.2.0 | 2026-05-26 | minor | GraphQL plugin with lexer/parser/AST/executor, plugin architecture (ServiceLoader, PluginContext), rate limit plugin, scheduler plugin
+1.1.0 | 2026-05-25 | minor | REST action dispatch, JSON service description, response caching (@Cache, @Static, @CacheByStatus), parameter injection, mixed path+body params, header case-insensitivity
+1.0.0 | 2026-05-24 | major | Initial release: NIO event loop, annotation-driven routing (@Action, @GET/@POST/@PUT/@DELETE), static file serving, HTML server-page rendering, JDBC utilities
