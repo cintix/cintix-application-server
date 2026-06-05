@@ -93,22 +93,40 @@ public class MyEndpoints {
 
 | Feature | Description |
 |---------|-------------|
-| **OpenAPI 3.0** | `server.enableOpenApi("My API", "1.0")` — auto-generates spec from registered endpoints. `@ApiDoc`/`@ApiTag` for metadata. Serves `/api/openapi.json` + Swagger UI at `/api/docs` |
+| **OpenAPI 3.0** | `server.enableOpenApi("My API", "1.0")` — auto-generates spec from registered endpoints. `@ApiDoc`/`@ApiTag`/`@ApiParam`/`@ApiSchema` for metadata. Serves `/api/openapi.json` + Swagger UI at `/api/docs` |
 | **MCP** | `server.enableMcp(handlers...)` — JSON-RPC 2.0 at `POST /api/mcp`. `@McpTool`/`@McpParam` annotations. Auto-discovers tools from endpoint classes |
 
 ```java
-// OpenAPI — one line
+// OpenAPI — one line (cookie auth default)
 server.enableOpenApi("My API", "1.0.0");
 
-// MCP — auto-discovers @McpTool methods from all registered endpoints
-server.enableMcp(new AdminTools());
+// With bearer auth + schema classes
+server.enableOpenApi("My API", "1.0.0", "bearer", User.class, Project.class);
 
-// Annotations on endpoint methods
+// @ApiDoc enriches operation metadata
+@POST @Action(path = "/api/projects")
+@ApiDoc(summary = "Create project", tag = "Projects",
+        example = "{\"name\":\"custom\",\"key\":\"CP\"}")  // overrides auto-generated
+public Response create(
+    @ApiParam(description = "Project name") String name,
+    @ApiParam(description = "Short key", required = false) String key) { ... }
+
+// @ApiParam documents path params with type + description
 @GET @Action(path = "/api/users/{id}")
 @ApiDoc(summary = "Get user", tag = "Users")
-@McpTool(name = "get_user", description = "Look up a user by ID")
-public Response getUser(String id) { ... }
+public Response getUser(
+    @ApiParam(description = "User ID", type = "integer") String id) { ... }
+
+// @ApiSchema defines reusable model in components/schemas
+@ApiSchema(description = "User account model")
+public class User { public String name; public String email; }
 ```
+
+**Auto-generated request body:** POST/PUT methods automatically get a JSON Schema with `properties` and `example` derived from the method's body parameters (all parameters after path variables). `@ApiParam` enriches each property with description and optional type override. `@ApiDoc.example` overrides the auto-generated example.
+
+**Security schemes:** `"cookie"` (default, `cookieAuth` apiKey in cookie named `session`) or `"bearer"` (`bearerAuth` HTTP bearer with JWT format).
+
+**Tag resolution:** `@ApiDoc.tag` > `@ApiTag.name` > class name. No longer falls back to path prefix guessing.
 
 ## Configuration
 

@@ -2,9 +2,12 @@ package dk.cintix.application.server.modules.openapi;
 
 import dk.cintix.application.server.infrastructure.annotations.Action;
 import dk.cintix.application.server.infrastructure.annotations.ApiDoc;
+import dk.cintix.application.server.infrastructure.annotations.ApiParam;
+import dk.cintix.application.server.infrastructure.annotations.ApiSchema;
 import dk.cintix.application.server.infrastructure.annotations.ApiTag;
 import dk.cintix.application.server.modules.http.server.services.domain.models.RestEndpoint;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,11 +17,20 @@ public class OpenApiService {
 
     private final String title;
     private final String version;
+    private final String securityScheme;
+    private final Class<?>[] schemaClasses;
     private final Map<String, Map<String, RestEndpoint>> endpoints;
 
     public OpenApiService(String title, String version, Map<String, Map<String, RestEndpoint>> endpoints) {
+        this(title, version, "cookie", endpoints);
+    }
+
+    public OpenApiService(String title, String version, String securityScheme,
+            Map<String, Map<String, RestEndpoint>> endpoints, Class<?>... schemaClasses) {
         this.title = title;
         this.version = version;
+        this.securityScheme = securityScheme != null && !securityScheme.isEmpty() ? securityScheme : "cookie";
+        this.schemaClasses = schemaClasses != null ? schemaClasses : new Class<?>[0];
         this.endpoints = endpoints;
     }
 
@@ -93,40 +105,162 @@ public class OpenApiService {
         }
 
         List<String> tags = new ArrayList<>();
-        tags.add(tagFor(action.path(), handlerClass, doc));
+        tags.add(tagFor(handlerClass, doc));
         op.put("tags", tags);
 
-        // Parameters from {placeholders}
-        List<Map<String, Object>> params = new ArrayList<>();
-        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\\{(\\w+)\\}").matcher(action.path());
-        while (matcher.find()) {
-            Map<String, Object> p = new LinkedHashMap<>();
-            p.put("name", matcher.group(1));
-            p.put("in", "path");
-            p.put("required", true);
-            p.put("schema", typeMap("string"));
-            params.add(p);
-        }
+        // Parameters from {placeholders} with @ApiParam enrichment
+        List<Map<String, Object>> params = buildParams(method, action);
         if (!params.isEmpty()) {
             op.put("parameters", params);
         }
 
-        // Request body for POST/PUT
+        // Request body for POST/PUT — auto-generate schema from body params
         if ("post".equals(httpMethod) || "put".equals(httpMethod)) {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("required", false);
-            String bodyDesc = (doc != null && !doc.requestBody().isEmpty()) ? doc.requestBody() : "Request body";
-            body.put("description", bodyDesc);
-            Map<String, Object> jsonContent = new LinkedHashMap<>();
-            jsonContent.put("application/json", schemaRef("body"));
-            body.put("content", jsonContent);
-            op.put("requestBody", body);
+            List<Parameter> bodyParams = getBodyParameters(method, action);
+            if (!bodyParams.isEmpty()) {
+                Map<String, Object> body = buildRequestBody(method, bodyParams, doc);
+                op.put("requestBody", body);
+            }
         }
 
         // Responses
+        op.put("responses", buildResponses(doc));
+
+        // Security
+        op.put("security", buildSecurity());
+
+        return op;
+    }
+
+    /**
+     * Builds path parameter definitions, enriched with @ApiParam annotations.
+     */
+    private List<Map<String, Object>> buildParams(Method method, Action action) {
+        List<Map<String, Object>> params = new ArrayList<>();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\\{(\\w+)\\}").matcher(action.path());
+        while (matcher.find()) {
+            String paramName = matcher.group(1);
+            Map<String, Object> p = new LinkedHashMap<>();
+            p.put("name", paramName);
+            p.put("in", "path");
+            p.put("required", true);
+
+            // Look for @ApiParam on method parameters matching this path param
+            ApiParam apiParam = findApiParam(method, paramName);
+            String type = "string";
+            String desc = "";
+            if (apiParam != null) {
+                if (!apiParam.type().isEmpty()) type = apiParam.type();
+                if (!apiParam.description().isEmpty()) desc = apiParam.description();
+            }
+            if (!desc.isEmpty()) p.put("description", desc);
+            p.put("schema", typeMap(type));
+            params.add(p);
+        }
+        return params;
+    }
+
+    /**
+     * Returns method parameters that are NOT path variables — these form the request body.
+     */
+    private List<Parameter> getBodyParameters(Method method, Action action) {
+        List<Parameter> bodyParams = new ArrayList<>();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\\{(\\w+)\\}").matcher(action.path());
+        int pathParamCount = 0;
+        while (matcher.find()) {
+            pathParamCount++;
+        }
+
+        Parameter[] allParams = method.getParameters();
+        for (int i = pathParamCount; i < allParams.length; i++) {
+            bodyParams.add(allParams[i]);
+        }
+        return bodyParams;
+    }
+
+    /**
+     * Builds a request body definition with auto-generated JSON Schema from method
+     * parameters, plus an example. @ApiDoc.example overrides the auto-generated example.
+     */
+    private Map<String, Object> buildRequestBody(Method method, List<Parameter> bodyParams, ApiDoc doc) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        String bodyDesc = (doc != null && !doc.requestBody().isEmpty()) ? doc.requestBody() : "Request body";
+        body.put("description", bodyDesc);
+        body.put("required", bodyParams.size() == 1 ? false : true);
+
+        Map<String, Object> properties = new LinkedHashMap<>();
+        List<String> requiredList = new ArrayList<>();
+        Map<String, Object> example = new LinkedHashMap<>();
+
+        for (Parameter param : bodyParams) {
+            ApiParam apiParam = param.getAnnotation(ApiParam.class);
+            String propName = param.getName();
+            String propType = jsonSchemaType(param.getType());
+            String propDesc = "";
+
+            if (apiParam != null) {
+                if (!apiParam.name().isEmpty()) propName = apiParam.name();
+                if (!apiParam.type().isEmpty()) propType = apiParam.type();
+                if (!apiParam.description().isEmpty()) propDesc = apiParam.description();
+                if (apiParam.required()) requiredList.add(propName);
+            } else {
+                requiredList.add(propName);
+            }
+
+            Map<String, Object> propSchema = new LinkedHashMap<>();
+            propSchema.put("type", propType);
+            if (!propDesc.isEmpty()) propSchema.put("description", propDesc);
+            properties.put(propName, propSchema);
+
+            example.put(propName, exampleValueForType(propType, propName));
+        }
+
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("properties", properties);
+        if (!requiredList.isEmpty()) {
+            schema.put("required", requiredList);
+        }
+
+        String contentType = (doc != null && !doc.contentType().isEmpty()) ? doc.contentType() : "application/json";
+        Map<String, Object> mediaType = new LinkedHashMap<>();
+        mediaType.put("schema", schema);
+
+        // Example: use @ApiDoc.example if set, otherwise auto-generated
+        if (doc != null && !doc.example().isEmpty()) {
+            try {
+                mediaType.put("example", new com.google.gson.Gson().fromJson(doc.example(), Object.class));
+            } catch (Exception e) {
+                mediaType.put("example", doc.example());
+            }
+        } else if (!example.isEmpty()) {
+            mediaType.put("example", example);
+        }
+
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put(contentType, mediaType);
+        body.put("content", content);
+
+        return body;
+    }
+
+    private Map<String, Object> buildResponses(ApiDoc doc) {
         Map<String, Object> responses = new LinkedHashMap<>();
+
         Map<String, Object> ok = new LinkedHashMap<>();
         ok.put("description", (doc != null && !doc.response200().isEmpty()) ? doc.response200() : "Successful");
+
+        if (doc != null && !doc.responseExample().isEmpty()) {
+            Map<String, Object> jsonContent = new LinkedHashMap<>();
+            Map<String, Object> mediaType = new LinkedHashMap<>();
+            try {
+                mediaType.put("example", new com.google.gson.Gson().fromJson(doc.responseExample(), Object.class));
+            } catch (Exception e) {
+                mediaType.put("example", doc.responseExample());
+            }
+            jsonContent.put("application/json", mediaType);
+            ok.put("content", jsonContent);
+        }
         responses.put("200", ok);
 
         if (doc != null && !doc.response400().isEmpty()) {
@@ -144,16 +278,17 @@ public class OpenApiService {
             err.put("description", "Unauthorized");
             responses.put("401", err);
         }
-        op.put("responses", responses);
 
-        // Security
+        return responses;
+    }
+
+    private List<Map<String, Object>> buildSecurity() {
         List<Map<String, Object>> security = new ArrayList<>();
         Map<String, Object> secEntry = new LinkedHashMap<>();
-        secEntry.put("cookieAuth", new ArrayList<>());
+        String schemeName = "cookie".equals(securityScheme) ? "cookieAuth" : "bearerAuth";
+        secEntry.put(schemeName, new ArrayList<>());
         security.add(secEntry);
-        op.put("security", security);
-
-        return op;
+        return security;
     }
 
     private String summaryFor(Method method, ApiDoc doc) {
@@ -164,7 +299,10 @@ public class OpenApiService {
         return name.replaceAll("([A-Z])", " $1").trim().toLowerCase();
     }
 
-    private String tagFor(String path, Class<?> handlerClass, ApiDoc doc) {
+    /**
+     * Tag priority: @ApiDoc.tag > @ApiTag.name > auto from class name
+     */
+    private String tagFor(Class<?> handlerClass, ApiDoc doc) {
         if (doc != null && !doc.tag().isEmpty()) {
             return doc.tag();
         }
@@ -172,48 +310,104 @@ public class OpenApiService {
         if (classTag != null && !classTag.name().isEmpty()) {
             return classTag.name();
         }
-        // Auto-tag from path prefix
-        String segment = path.replaceFirst("^/api/", "");
-        if (segment.contains("/")) {
-            segment = segment.substring(0, segment.indexOf("/"));
-        }
-        if (!segment.isEmpty()) {
-            return segment.substring(0, 1).toUpperCase() + segment.substring(1);
-        }
-        return "General";
+        return handlerClass.getSimpleName().replace("Endpoint", "");
     }
 
     private Map<String, Object> components() {
         Map<String, Object> comp = new LinkedHashMap<>();
 
+        // Security schemes
         Map<String, Object> sec = new LinkedHashMap<>();
-        Map<String, Object> cookie = new LinkedHashMap<>();
-        cookie.put("type", "apiKey");
-        cookie.put("in", "cookie");
-        cookie.put("name", "session");
-        sec.put("cookieAuth", cookie);
+        if ("bearer".equals(securityScheme)) {
+            Map<String, Object> bearer = new LinkedHashMap<>();
+            bearer.put("type", "http");
+            bearer.put("scheme", "bearer");
+            bearer.put("bearerFormat", "JWT");
+            sec.put("bearerAuth", bearer);
+        } else {
+            Map<String, Object> cookie = new LinkedHashMap<>();
+            cookie.put("type", "apiKey");
+            cookie.put("in", "cookie");
+            cookie.put("name", "session");
+            sec.put("cookieAuth", cookie);
+        }
         comp.put("securitySchemes", sec);
 
+        // Schemas from @ApiSchema classes
         Map<String, Object> schemas = new LinkedHashMap<>();
-        Map<String, Object> bodySchema = new LinkedHashMap<>();
-        bodySchema.put("type", "object");
-        schemas.put("body", bodySchema);
-        comp.put("schemas", schemas);
+        for (Class<?> cls : schemaClasses) {
+            ApiSchema schema = cls.getAnnotation(ApiSchema.class);
+            if (schema != null) {
+                String schemaName = !schema.name().isEmpty() ? schema.name() : cls.getSimpleName();
+                Map<String, Object> schemaDef = new LinkedHashMap<>();
+                schemaDef.put("type", "object");
+                if (!schema.description().isEmpty()) {
+                    schemaDef.put("description", schema.description());
+                }
+
+                Map<String, Object> schemaProps = new LinkedHashMap<>();
+                for (java.lang.reflect.Field field : cls.getDeclaredFields()) {
+                    Map<String, Object> fieldSchema = new LinkedHashMap<>();
+                    fieldSchema.put("type", jsonSchemaType(field.getType()));
+                    schemaProps.put(field.getName(), fieldSchema);
+                }
+                if (!schemaProps.isEmpty()) {
+                    schemaDef.put("properties", schemaProps);
+                }
+                schemas.put(schemaName, schemaDef);
+            }
+        }
+        if (!schemas.isEmpty()) {
+            comp.put("schemas", schemas);
+        } else {
+            Map<String, Object> bodySchema = new LinkedHashMap<>();
+            bodySchema.put("type", "object");
+            schemas.put("body", bodySchema);
+            comp.put("schemas", schemas);
+        }
 
         return comp;
+    }
+
+    private static ApiParam findApiParam(Method method, String paramName) {
+        for (Parameter p : method.getParameters()) {
+            ApiParam ap = p.getAnnotation(ApiParam.class);
+            if (ap != null) {
+                String name = !ap.name().isEmpty() ? ap.name() : p.getName();
+                if (name.equals(paramName)) {
+                    return ap;
+                }
+            }
+            if (p.getName().equals(paramName)) {
+                return p.getAnnotation(ApiParam.class);
+            }
+        }
+        return null;
+    }
+
+    private static String jsonSchemaType(Class<?> type) {
+        if (type == String.class) return "string";
+        if (type == int.class || type == Integer.class
+                || type == long.class || type == Long.class
+                || type == short.class || type == Short.class) return "integer";
+        if (type == double.class || type == Double.class
+                || type == float.class || type == Float.class) return "number";
+        if (type == boolean.class || type == Boolean.class) return "boolean";
+        if (Map.class.isAssignableFrom(type)) return "object";
+        if (List.class.isAssignableFrom(type) || type.isArray()) return "array";
+        return "string";
+    }
+
+    private static String exampleValueForType(String jsonType, String name) {
+        if ("integer".equals(jsonType)) return "0";
+        if ("number".equals(jsonType)) return "0.0";
+        if ("boolean".equals(jsonType)) return "false";
+        return name;
     }
 
     private static Map<String, Object> typeMap(String type) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("type", type);
-        return m;
-    }
-
-    private static Map<String, Object> schemaRef(String name) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        Map<String, Object> ref = new LinkedHashMap<>();
-        ref.put("$ref", "#/components/schemas/" + name);
-        m.put("schema", ref);
         return m;
     }
 }

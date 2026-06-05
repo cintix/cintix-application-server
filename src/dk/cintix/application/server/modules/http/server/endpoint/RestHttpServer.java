@@ -349,7 +349,12 @@ public abstract class RestHttpServer implements HttpModule {
     }
 
     public void enableOpenApi(String specTitle, String specVersion) {
-        OpenApiService service = new OpenApiService(specTitle, specVersion, getRegisteredEndpoints());
+        enableOpenApi(specTitle, specVersion, "cookie");
+    }
+
+    public void enableOpenApi(String specTitle, String specVersion, String securityScheme, Class<?>... schemaClasses) {
+        OpenApiService service = new OpenApiService(specTitle, specVersion, securityScheme,
+                getRegisteredEndpoints(), schemaClasses);
         addEndpoint("/api", new OpenApiEndpoint(service));
     }
 

@@ -20,4 +20,7 @@ public @interface ApiDoc {
     String response200() default "";
     String response400() default "";
     String response401() default "";
+    String example() default "";
+    String responseExample() default "";
+    String contentType() default "";
 }

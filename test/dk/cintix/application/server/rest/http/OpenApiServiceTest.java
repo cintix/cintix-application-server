@@ -3,6 +3,8 @@ package dk.cintix.application.server.rest.http;
 import dk.cintix.application.server.TestSupport;
 import dk.cintix.application.server.infrastructure.annotations.Action;
 import dk.cintix.application.server.infrastructure.annotations.ApiDoc;
+import dk.cintix.application.server.infrastructure.annotations.ApiParam;
+import dk.cintix.application.server.infrastructure.annotations.ApiSchema;
 import dk.cintix.application.server.infrastructure.annotations.ApiTag;
 import dk.cintix.application.server.infrastructure.annotations.DELETE;
 import dk.cintix.application.server.infrastructure.annotations.GET;
@@ -29,6 +31,14 @@ public class OpenApiServiceTest {
         multipleMethodsOnSamePathAreMerged();
         httpMethodsAreCorrect();
         deprecatedFlagIsSet();
+        apiParamEnrichesPathParameters();
+        requestBodyAutoGeneratesSchema();
+        apiDocExampleOverridesAutoExample();
+        apiSchemaInComponents();
+        bearerAuthSecurityScheme();
+        tagForUsesApiTagWithoutApiPrefix();
+        requestBodyWithMultipleParams();
+        customContentType();
     }
 
     // --- Happy paths ---
@@ -242,6 +252,222 @@ public class OpenApiServiceTest {
         TestSupport.assertEquals(true, putOp.get("deprecated"), "PUT /api/items/{id} should be deprecated");
     }
 
+    public void apiParamEnrichesPathParameters() {
+        // Arrange
+        server = new RestHttpServer() {};
+        server.addEndpoint("/api", new ParamEndpoint());
+        OpenApiService service = new OpenApiService("API", "1.0", server.getRegisteredEndpoints());
+
+        // Act
+        Map<String, Object> spec = service.generate();
+
+        // Assert
+        @SuppressWarnings("unchecked")
+        Map<String, Object> paths = (Map<String, Object>) spec.get("paths");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> itemPath = (Map<String, Object>) paths.get("/api/params/{id}");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> getOp = (Map<String, Object>) itemPath.get("get");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> params = (List<Map<String, Object>>) getOp.get("parameters");
+        Map<String, Object> idParam = params.get(0);
+        TestSupport.assertEquals("integer", ((Map<String, Object>) idParam.get("schema")).get("type"), "@ApiParam type should be integer");
+        TestSupport.assertEquals("The item ID", idParam.get("description"), "@ApiParam description should be set");
+    }
+
+    public void requestBodyAutoGeneratesSchema() {
+        // Arrange
+        server = new RestHttpServer() {};
+        server.addEndpoint("/api", new ParamEndpoint());
+        OpenApiService service = new OpenApiService("API", "1.0", server.getRegisteredEndpoints());
+
+        // Act
+        Map<String, Object> spec = service.generate();
+
+        // Assert
+        @SuppressWarnings("unchecked")
+        Map<String, Object> paths = (Map<String, Object>) spec.get("paths");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> createPath = (Map<String, Object>) paths.get("/api/params");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> postOp = (Map<String, Object>) createPath.get("post");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) postOp.get("requestBody");
+        TestSupport.assertTrue(body != null, "POST should have requestBody");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> content = (Map<String, Object>) body.get("content");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> json = (Map<String, Object>) content.get("application/json");
+        TestSupport.assertTrue(json != null, "should have application/json content");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> schema = (Map<String, Object>) json.get("schema");
+        TestSupport.assertEquals("object", schema.get("type"), "schema should be object");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+        TestSupport.assertTrue(properties.containsKey("name"), "should have name property");
+        TestSupport.assertTrue(properties.containsKey("type"), "should have type property");
+
+        // Example should be auto-generated
+        TestSupport.assertTrue(json.containsKey("example"), "should have auto-generated example");
+    }
+
+    public void apiDocExampleOverridesAutoExample() {
+        // Arrange
+        server = new RestHttpServer() {};
+        server.addEndpoint("/api", new ExampleEndpoint());
+        OpenApiService service = new OpenApiService("API", "1.0", server.getRegisteredEndpoints());
+
+        // Act
+        Map<String, Object> spec = service.generate();
+
+        // Assert
+        @SuppressWarnings("unchecked")
+        Map<String, Object> paths = (Map<String, Object>) spec.get("paths");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> exPath = (Map<String, Object>) paths.get("/api/example");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> postOp = (Map<String, Object>) exPath.get("post");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) postOp.get("requestBody");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> content = (Map<String, Object>) body.get("content");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> json = (Map<String, Object>) content.get("application/json");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> example = (Map<String, Object>) json.get("example");
+        TestSupport.assertEquals("custom-value", example.get("field"), "example should use @ApiDoc value");
+    }
+
+    public void apiSchemaInComponents() {
+        // Arrange
+        server = new RestHttpServer() {};
+        server.addEndpoint("/api", new TaggedEndpoint());
+        OpenApiService service = new OpenApiService("API", "1.0", "cookie",
+                server.getRegisteredEndpoints(), ModelA.class, ModelB.class);
+
+        // Act
+        Map<String, Object> spec = service.generate();
+
+        // Assert
+        @SuppressWarnings("unchecked")
+        Map<String, Object> components = (Map<String, Object>) spec.get("components");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> schemas = (Map<String, Object>) components.get("schemas");
+        TestSupport.assertTrue(schemas.containsKey("ModelA"), "should have ModelA schema");
+        TestSupport.assertTrue(schemas.containsKey("ModelB"), "should have ModelB schema");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> modelA = (Map<String, Object>) schemas.get("ModelA");
+        TestSupport.assertEquals("object", modelA.get("type"), "ModelA should be object");
+        TestSupport.assertEquals("First model", modelA.get("description"), "ModelA description from @ApiSchema");
+    }
+
+    public void bearerAuthSecurityScheme() {
+        // Arrange
+        server = new RestHttpServer() {};
+        server.addEndpoint("/api", new TaggedEndpoint());
+        OpenApiService service = new OpenApiService("API", "1.0", "bearer", server.getRegisteredEndpoints());
+
+        // Act
+        Map<String, Object> spec = service.generate();
+
+        // Assert
+        @SuppressWarnings("unchecked")
+        Map<String, Object> components = (Map<String, Object>) spec.get("components");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> sec = (Map<String, Object>) components.get("securitySchemes");
+        TestSupport.assertTrue(sec.containsKey("bearerAuth"), "should have bearerAuth");
+        TestSupport.assertFalse(sec.containsKey("cookieAuth"), "should not have cookieAuth");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> paths = (Map<String, Object>) spec.get("paths");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> dataPath = (Map<String, Object>) paths.get("/api/data");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> getOp = (Map<String, Object>) dataPath.get("get");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> security = (List<Map<String, Object>>) getOp.get("security");
+        TestSupport.assertTrue(security.get(0).containsKey("bearerAuth"), "operation should use bearerAuth");
+    }
+
+    public void tagForUsesApiTagWithoutApiPrefix() {
+        // Arrange
+        server = new RestHttpServer() {};
+        server.addEndpoint("/api", new NonApiEndpoint());
+        OpenApiService service = new OpenApiService("API", "1.0", server.getRegisteredEndpoints());
+
+        // Act
+        Map<String, Object> spec = service.generate();
+
+        // Assert
+        @SuppressWarnings("unchecked")
+        Map<String, Object> paths = (Map<String, Object>) spec.get("paths");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> dashPath = (Map<String, Object>) paths.get("/dashboard");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> getOp = (Map<String, Object>) dashPath.get("get");
+        @SuppressWarnings("unchecked")
+        List<String> tags = (List<String>) getOp.get("tags");
+        TestSupport.assertEquals("Dashboard", tags.get(0), "tag should use @ApiTag name, not 'General'");
+    }
+
+    public void requestBodyWithMultipleParams() {
+        // Arrange
+        server = new RestHttpServer() {};
+        server.addEndpoint("/api", new ParamEndpoint());
+        OpenApiService service = new OpenApiService("API", "1.0", server.getRegisteredEndpoints());
+
+        // Act
+        Map<String, Object> spec = service.generate();
+
+        // Assert
+        @SuppressWarnings("unchecked")
+        Map<String, Object> paths = (Map<String, Object>) spec.get("paths");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> multiPath = (Map<String, Object>) paths.get("/api/multi");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> postOp = (Map<String, Object>) multiPath.get("post");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) postOp.get("requestBody");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> content = (Map<String, Object>) body.get("content");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> json = (Map<String, Object>) content.get("application/json");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> schema = (Map<String, Object>) json.get("schema");
+        @SuppressWarnings("unchecked")
+        List<String> required = (List<String>) schema.get("required");
+        TestSupport.assertTrue(required.contains("name"), "name should be required");
+        TestSupport.assertTrue(required.contains("priority"), "priority should be required");
+    }
+
+    public void customContentType() {
+        // Arrange
+        server = new RestHttpServer() {};
+        server.addEndpoint("/api", new ExampleEndpoint());
+        OpenApiService service = new OpenApiService("API", "1.0", server.getRegisteredEndpoints());
+
+        // Act
+        Map<String, Object> spec = service.generate();
+
+        // Assert
+        @SuppressWarnings("unchecked")
+        Map<String, Object> paths = (Map<String, Object>) spec.get("paths");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> loginPath = (Map<String, Object>) paths.get("/api/login");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> postOp = (Map<String, Object>) loginPath.get("post");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) postOp.get("requestBody");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> content = (Map<String, Object>) body.get("content");
+        TestSupport.assertTrue(content.containsKey("application/x-www-form-urlencoded"), "should have form content type");
+    }
+
     // --- Test endpoint classes ---
 
     @ApiTag(name = "Items", description = "Item management")
@@ -290,6 +516,65 @@ public class OpenApiServiceTest {
         @GET
         @Action(path = "/api/regex-test/{id}")
         public Response get(String id) { return new Response().OK(); }
+    }
+
+    public static class ParamEndpoint {
+        @GET
+        @Action(path = "/api/params/{id}")
+        public Response getById(
+                @ApiParam(name = "id", description = "The item ID", type = "integer") String id) {
+            return new Response().OK();
+        }
+
+        @POST
+        @Action(path = "/api/params")
+        public Response create(
+                @ApiParam(description = "Item name") String name,
+                @ApiParam(description = "Item type") String type) {
+            return new Response().OK();
+        }
+
+        @POST
+        @Action(path = "/api/multi")
+        public Response createMulti(
+                @ApiParam(description = "Item name") String name,
+                @ApiParam(description = "Priority level") String priority) {
+            return new Response().OK();
+        }
+    }
+
+    public static class ExampleEndpoint {
+        @POST
+        @Action(path = "/api/example")
+        @ApiDoc(example = "{\"field\":\"custom-value\"}")
+        public Response create(String field) {
+            return new Response().OK();
+        }
+
+        @POST
+        @Action(path = "/api/login")
+        @ApiDoc(contentType = "application/x-www-form-urlencoded")
+        public Response login(String username, String password) {
+            return new Response().OK();
+        }
+    }
+
+    @ApiSchema(name = "ModelA", description = "First model")
+    public static class ModelA {
+        public String field1;
+        public int field2;
+    }
+
+    @ApiSchema(description = "Second model")
+    public static class ModelB {
+        public String name;
+    }
+
+    @ApiTag(name = "Dashboard", description = "Dashboard pages")
+    public static class NonApiEndpoint {
+        @GET
+        @Action(path = "/dashboard")
+        public Response index() { return new Response().OK(); }
     }
 
     public static class CrudEndpoint {
