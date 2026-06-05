@@ -95,7 +95,7 @@ public class HttpUtil {
         Pattern pattern = Pattern.compile(patternString);
         Matcher matcher = pattern.matcher(path);
         while (matcher.find()) {
-            realPattern = realPattern.replaceAll(Pattern.quote(matcher.group(0)), "(\\\\S+)");
+            realPattern = realPattern.replaceAll(Pattern.quote(matcher.group(0)), "([^/]+)");
         }
         return "^(" + realPattern + ")$";
     }

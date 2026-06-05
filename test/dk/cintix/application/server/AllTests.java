@@ -12,6 +12,8 @@ import dk.cintix.application.server.rest.http.GraphQLEndpointTest;
 import dk.cintix.application.server.rest.http.RestHttpRequestHeaderTest;
 import dk.cintix.application.server.rest.http.ServerPagePropertyMergeTest;
 import dk.cintix.application.server.rest.http.RestHttpServerKeepAliveTest;
+import dk.cintix.application.server.rest.http.McpDispatcherTest;
+import dk.cintix.application.server.rest.http.OpenApiServiceTest;
 import dk.cintix.application.server.rest.http.RestHttpServerPathTest;
 import dk.cintix.application.server.rest.http.RestHttpServerHealthCheckTest;
 import dk.cintix.application.server.rest.http.RestHttpServerHttp11ComplianceTest;
@@ -42,6 +44,8 @@ public class AllTests {
         new CacheTest().runAll();
         new GraphQLEndpointTest().runAll();
         new PluginSystemTest().runAll();
+        new OpenApiServiceTest().runAll();
+        new McpDispatcherTest().runAll();
         System.out.println("All tests passed.");
     }
 }

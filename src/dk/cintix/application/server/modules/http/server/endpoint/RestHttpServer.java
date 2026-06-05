@@ -26,6 +26,11 @@ import dk.cintix.application.server.modules.http.server.services.domain.models.R
 import dk.cintix.application.server.modules.http.server.services.domain.models.RestClient;
 import dk.cintix.application.server.modules.http.server.services.domain.models.RestEndpoint;
 import dk.cintix.html.engine.HTMLEngine;
+import dk.cintix.application.server.modules.mcp.McpDispatcher;
+import dk.cintix.application.server.modules.mcp.McpEndpoint;
+import dk.cintix.application.server.modules.mcp.McpRegistry;
+import dk.cintix.application.server.modules.openapi.OpenApiEndpoint;
+import dk.cintix.application.server.modules.openapi.OpenApiService;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -157,6 +162,19 @@ public abstract class RestHttpServer implements HttpModule {
     }
 
     public int getIdleReadTimeoutMs() { return idleReadTimeoutMs; }
+
+    /**
+     * Returns a snapshot of all registered REST endpoints.
+     * Returns the frozen mapping if the server has started, otherwise the live mapping.
+     */
+    public Map<String, Map<String, RestEndpoint>> getRegisteredEndpoints() {
+        Map<String, Map<String, RestEndpoint>> source = frozenPathMapping != null ? frozenPathMapping : pathMapping;
+        Map<String, Map<String, RestEndpoint>> unmodifiable = new LinkedHashMap<>();
+        for (Map.Entry<String, Map<String, RestEndpoint>> entry : source.entrySet()) {
+            unmodifiable.put(entry.getKey(), Collections.unmodifiableMap(new LinkedHashMap<>(entry.getValue())));
+        }
+        return Collections.unmodifiableMap(unmodifiable);
+    }
 
     /**
      * Executes all registered health checks and returns a JSON status response.
@@ -328,6 +346,20 @@ public abstract class RestHttpServer implements HttpModule {
 
     public WebSocketService getWebSocketService() {
         return webSocketService;
+    }
+
+    public void enableOpenApi(String specTitle, String specVersion) {
+        OpenApiService service = new OpenApiService(specTitle, specVersion, getRegisteredEndpoints());
+        addEndpoint("/api", new OpenApiEndpoint(service));
+    }
+
+    public void enableMcp(Object... toolHandlers) {
+        McpRegistry registry = new McpRegistry();
+        for (Object handler : toolHandlers) {
+            registry.register(handler);
+        }
+        registry.scanRegisteredEndpoints(getRegisteredEndpoints());
+        addEndpoint("/api", new McpEndpoint(new McpDispatcher(registry)));
     }
 
     private void registerWebSocketEndpoint(WebSocketService service, String path, Object endpoint) {

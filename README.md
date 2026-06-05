@@ -226,3 +226,33 @@ These are "next level" improvements — the server is production-ready without t
 | **OpenAPI** | Generate OpenAPI 3.0 spec from annotations (extends the built-in `?jsd` JSON service descriptor). |
 | **Multipart upload** | `@Upload` annotation, stream files to disk. |
 | **Redis caching** | `@Cache` backed by Redis instead of in-memory. |
+| **OpenAPI & MCP** | Built-in. `server.enableOpenApi(title, version)` and `server.enableMcp(toolHandlers...)` — see below. |
+
+## OpenAPI & MCP (built-in)
+
+### OpenAPI Documentation
+
+Enable after registering endpoints:
+
+```java
+server.addEndpoint("/api", new UserEndpoint(), new ProjectEndpoint());
+server.enableOpenApi("My API", "1.0.0");
+```
+
+Serves `GET /api/openapi.json` (OpenAPI 3.0.3 spec) and `GET /api/docs` (Swagger UI).
+
+**`@ApiDoc`** on `@Action` methods: `summary`, `description`, `tag`, `deprecated`.
+**`@ApiTag`** on endpoint classes: sets default `name` and `description` for all methods in that class.
+Without annotations, summaries are auto-generated from method names and tags from path prefixes.
+
+### MCP (Model Context Protocol)
+
+```java
+server.enableMcp(new AdminTools());
+```
+
+Registers `POST /api/mcp` (JSON-RPC 2.0, MCP `2024-11-05`). Auth via existing `addRequestFilter()`.
+
+**`@McpTool`** marks a method as an MCP tool. **`@McpParam`** on parameters for name/description/required. Java types auto-map to JSON Schema: `String→"string"`, `int/Integer→"integer"`, `boolean/Boolean→"boolean"`, `Map→"object"`, `List→"array"`.
+
+Any `@McpTool` method on an endpoint class registered via `addEndpoint()` is auto-discovered — no separate registration needed.
