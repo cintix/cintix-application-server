@@ -223,10 +223,8 @@ These are "next level" improvements — the server is production-ready without t
 | **CORS plugin** | `@CrossOrigin` annotation, header injection as a plugin. |
 | **Auth plugin** | `@Authenticated`, JWT validation, OAuth2 client. |
 | **Metrics** | Prometheus `/metrics` endpoint — request counts, latency histograms, active connections. |
-| **OpenAPI** | Generate OpenAPI 3.0 spec from annotations (extends the built-in `?jsd` JSON service descriptor). |
 | **Multipart upload** | `@Upload` annotation, stream files to disk. |
 | **Redis caching** | `@Cache` backed by Redis instead of in-memory. |
-| **OpenAPI & MCP** | Built-in. `server.enableOpenApi(title, version)` and `server.enableMcp(toolHandlers...)` — see below. |
 
 ## OpenAPI & MCP (built-in)
 
