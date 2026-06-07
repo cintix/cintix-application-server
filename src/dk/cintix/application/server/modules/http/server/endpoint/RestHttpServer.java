@@ -753,7 +753,14 @@ public abstract class RestHttpServer implements HttpModule {
         int totalRead = 0;
         int MAX_BYTES = 1024 * 1024 * 5; // 5MB
 
-        int readResult = client.read(dataBuffer);
+        int readResult;
+        try {
+            readResult = client.read(dataBuffer);
+        } catch (IOException e) {
+            logger.log(Level.FINER, "Client reset connection during read: {0}", e.getMessage());
+            handleDisconnect(key);
+            return;
+        }
         if (readResult == -1) {
             handleDisconnect(key);
             return;
@@ -770,17 +777,23 @@ public abstract class RestHttpServer implements HttpModule {
         dataBuffer.clear();
 
         // Read any additional available data
-        while ((read = client.read(dataBuffer)) > 0) {
-            totalRead += read;
-            if (totalRead > MAX_BYTES) {
-                break;
-            }
+        try {
+            while ((read = client.read(dataBuffer)) > 0) {
+                totalRead += read;
+                if (totalRead > MAX_BYTES) {
+                    break;
+                }
 
-            dataBuffer.flip();
-            bytes = new byte[dataBuffer.limit()];
-            dataBuffer.get(bytes);
-            data += new String(bytes);
-            dataBuffer.clear();
+                dataBuffer.flip();
+                bytes = new byte[dataBuffer.limit()];
+                dataBuffer.get(bytes);
+                data += new String(bytes);
+                dataBuffer.clear();
+            }
+        } catch (IOException e) {
+            logger.log(Level.FINER, "Client reset connection during additional read: {0}", e.getMessage());
+            handleDisconnect(key);
+            return;
         }
 
         if (data != null && data.length() > 0) {
