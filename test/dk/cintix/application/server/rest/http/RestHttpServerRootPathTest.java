@@ -4,10 +4,12 @@ import dk.cintix.application.server.TestSupport;
 import dk.cintix.application.server.infrastructure.annotations.Action;
 import dk.cintix.application.server.infrastructure.annotations.GET;
 import dk.cintix.application.server.infrastructure.annotations.POST;
+import dk.cintix.application.server.infrastructure.modules.ModuleRegistry;
 import dk.cintix.application.server.modules.http.server.HttpModule;
 import dk.cintix.application.server.modules.http.server.endpoint.RestHttpRequest;
 import dk.cintix.application.server.modules.http.server.endpoint.RestHttpServer;
 import dk.cintix.application.server.modules.http.server.services.domain.models.Response;
+import dk.cintix.application.server.modules.ratelimit.services.RateLimitModuleService;
 import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -88,6 +90,7 @@ public class RestHttpServerRootPathTest {
         requestFilter_runsForAllRequests_evenWithoutMatchingEndpoint();
         endpointHasPriority_overStaticFileServing();
         directoryPath_doesNotBreakEndpointMatching();
+        rateLimiter_doesNotCrashOnStaticFiles();
     }
 
     /**
@@ -300,6 +303,62 @@ public class RestHttpServerRootPathTest {
             }
         } catch (Exception e) {
             throw new RuntimeException("directoryPath_doesNotBreakEndpointMatching failed", e);
+        }
+    }
+
+    /**
+     * Regression test: rate limiter must not crash on static files.
+     * When a request matches a static file (e.g. /css/app.css), there is no
+     * @Action endpoint, so EndpointInfo is null. RateLimitModuleService.apply()
+     * must handle null endpoint gracefully instead of throwing NullPointerException.
+     */
+    public void rateLimiter_doesNotCrashOnStaticFiles() {
+        try {
+            // Arrange — create a static CSS file
+            File webDir = new File("web");
+            boolean createdWebDir = webDir.mkdirs();
+            File cssFile = new File("web/app.css");
+            java.nio.file.Files.write(cssFile.toPath(), "body { color: red; }".getBytes());
+
+            RestHttpServer server = new RestHttpServer() {};
+            server.setDocumentRoot("web");  // enable static file serving
+            server.bind(new InetSocketAddress(0));
+
+            // Enable rate limiting globally — the rate limiter filter will run
+            // for ALL requests including static files
+            RateLimitModuleService rateLimit = new RateLimitModuleService();
+            rateLimit.setEnabled(true);
+            rateLimit.setDefaultRequests(100);
+            rateLimit.setDefaultPerSeconds(60);
+            ModuleRegistry.initialize(server, rateLimit);
+
+            Thread t = new Thread(() -> { try { server.startServer(); } catch (Exception e) {} });
+            t.setDaemon(true);
+            t.start();
+            Thread.sleep(100);
+            int port = server.getPort();
+
+            // Act — request a static file (no matching @Action endpoint)
+            String response = sendRequest(port,
+                "GET /app.css HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+
+            // Assert — should return 200 with the CSS content, not 500
+            TestSupport.assertTrue(response.contains("200 OK"),
+                "Static file should return 200 OK, got: " +
+                    response.substring(0, Math.min(response.length(), 200)));
+            TestSupport.assertTrue(response.contains("body { color: red; }"),
+                "Static file should return CSS content");
+            TestSupport.assertTrue(!response.contains("500"),
+                "Rate limiter must not crash on static files (null endpoint)");
+
+            // Cleanup
+            server.setRunning(false);
+            t.join(3000);
+            rateLimit.shutdown();
+            cssFile.delete();
+            if (createdWebDir) webDir.delete();
+        } catch (Exception e) {
+            throw new RuntimeException("rateLimiter_doesNotCrashOnStaticFiles failed", e);
         }
     }
 }

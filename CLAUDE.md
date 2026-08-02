@@ -304,7 +304,13 @@ Four fixes that together make `@Action(path = "/")` and `RequestFilter` work cor
 
 4. **Directory paths no longer break endpoint matching** — `isRequestADocument()` now checks `checkFile.isFile()` in addition to `checkFile.exists()`. Previously a directory (e.g. `web/app/`) returned `true` for `exists()`, causing `Files.readAllBytes()` to throw `IOException: Is a directory` (500) instead of falling through to endpoint matching.
 
-**Test coverage:** `RestHttpServerRootPathTest` (5 tests) covers all four fixes.
+**Test coverage:** `RestHttpServerRootPathTest` (6 tests) covers all four fixes plus the rate limiter regression test below.
+
+### Rate limiter null-endpoint crash on static files (2026-08-02)
+
+`RateLimitModuleService.apply()` called `endpoint.getAnnotation()` without checking for null. After the root path fix made `EndpointInfo` null for unmatched paths (including static files like `/css/app.css`), the rate limiter threw `NullPointerException` on every static file request.
+
+**Fix:** Added `if (endpoint == null) return null;` at the top of `apply()` — static files and other unmatched paths skip rate limiting entirely.
 
 ## Production Readiness
 

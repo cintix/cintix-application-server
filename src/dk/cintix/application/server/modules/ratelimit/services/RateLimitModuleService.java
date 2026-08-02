@@ -126,6 +126,11 @@ public class RateLimitModuleService implements RateLimitModule {
     // --- Internal ---
 
     private Response apply(RestHttpRequest request, HttpModule.EndpointInfo endpoint) {
+        // Static files and unmatched paths have no endpoint — no rate limit needed
+        if (endpoint == null) {
+            return null;
+        }
+
         // Resolve effective rate limit: annotation overrides global
         int maxRequests;
         int perSeconds;
