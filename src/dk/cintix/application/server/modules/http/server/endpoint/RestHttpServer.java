@@ -967,7 +967,7 @@ public abstract class RestHttpServer implements HttpModule {
     private boolean isRequestADocument(String context) {
         File jailedRoot = new File(documentRoot);
         File checkFile = new File(getDocumentRoot() + context);
-        if (checkFile.exists()) {
+        if (checkFile.exists() && checkFile.isFile()) {
             if (checkFile.getAbsolutePath().startsWith(jailedRoot.getAbsolutePath())) {
                 return true;
             }
@@ -990,6 +990,35 @@ public abstract class RestHttpServer implements HttpModule {
             return new Response().OK().ContentType("application/json").model(documentationEndpoint.get(contextPath));
         }
 
+        // Locate endpoint first so we can pass EndpointInfo to request filters.
+        // Endpoint matching has priority over static document serving.
+        Map<String, RestEndpoint> requestMap = pathMapping.get(request.getMethod().toLowerCase());
+        RestActionService restAction = locateEndpoint(requestMap, contextPath.trim());
+
+        // When contextPath is empty (request to "/"), also try matching against "/"
+        // because registerEndpoint stores the root endpoint with key "/" (base + "").
+        if (restAction == null && contextPath.equals("")) {
+            restAction = locateEndpoint(requestMap, "/");
+        }
+
+        // Run request filters for ALL requests, even those without a matching endpoint.
+        // This allows filters (e.g. rate limiting, auth, custom root-path handlers) to
+        // intercept any request regardless of whether an @Action endpoint exists for it.
+        HttpModule.EndpointInfo endpointInfo = restAction != null
+            ? new HttpModule.EndpointInfo(restAction.getEndpoint().getPath(), restAction.getEndpoint().getMethod(), restAction.getEndpoint().getObject())
+            : null;
+        for (HttpModule.RequestFilter filter : requestFilters) {
+            Response filterResponse = filter.filter(request, endpointInfo);
+            if (filterResponse != null) {
+                return filterResponse;
+            }
+        }
+
+        if (restAction != null) {
+            return restAction.process(request);
+        }
+
+        // No endpoint matched and no filter intercepted — fall through to static document serving
         if (contextPath.equals("")) {
             contextPath = "/index.htm";
             if (!isRequestADocument(contextPath)) {
@@ -1018,29 +1047,7 @@ public abstract class RestHttpServer implements HttpModule {
             return new Response().OK().ContentType(contextType).Content(fileContent);
         }
 
-        Map<String, RestEndpoint> requestMap = pathMapping.get(request.getMethod().toLowerCase());
-        RestActionService restAction = locateEndpoint(requestMap, contextPath.trim());
-
-        if (restAction != null) {
-            Response filteredResponse = applyRequestFilters(request, restAction.getEndpoint());
-            if (filteredResponse != null) {
-                return filteredResponse;
-            }
-            return restAction.process(request);
-        } else {
-            return new Response().NotFound();
-        }
-    }
-
-    private Response applyRequestFilters(RestHttpRequest request, RestEndpoint endpoint) {
-        HttpModule.EndpointInfo endpointInfo = new HttpModule.EndpointInfo(endpoint.getPath(), endpoint.getMethod(), endpoint.getObject());
-        for (HttpModule.RequestFilter filter : requestFilters) {
-            Response response = filter.filter(request, endpointInfo);
-            if (response != null) {
-                return response;
-            }
-        }
-        return null;
+        return new Response().NotFound();
     }
 
     private RestActionService locateEndpoint(Map<String, RestEndpoint> mapping, String contextPath) throws Exception {

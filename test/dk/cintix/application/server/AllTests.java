@@ -17,6 +17,7 @@ import dk.cintix.application.server.rest.http.OpenApiServiceTest;
 import dk.cintix.application.server.rest.http.RestHttpServerPathTest;
 import dk.cintix.application.server.rest.http.RestHttpServerHealthCheckTest;
 import dk.cintix.application.server.rest.http.RestHttpServerHttp11ComplianceTest;
+import dk.cintix.application.server.rest.http.RestHttpServerRootPathTest;
 import dk.cintix.application.server.rest.http.RestHttpServerWorkerPoolTest;
 import dk.cintix.application.server.rest.http.WebSocketQueryStringTest;
 import dk.cintix.application.server.rest.http.utils.HttpUtilTest;
@@ -34,6 +35,7 @@ public class AllTests {
         new RestHttpServerHttp11ComplianceTest().runAll();
         new RestHttpServerHealthCheckTest().runAll();
         new RestHttpServerKeepAliveTest().runAll();
+        new RestHttpServerRootPathTest().runAll();
         new RestHttpServerPathTest().runAll();
         new RestActionCacheKeyTest().runAll();
         new EntityManagerInjectionTest().runAll();

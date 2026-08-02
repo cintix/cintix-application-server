@@ -292,6 +292,20 @@ Three fixes that together make the WebSocket layer production-ready:
 
 3. **Keepalive ping/pong** — A daemon thread (`ws-keepalive`) sends OP_PING every 30 seconds to all WebSocket connections and closes any session that hasn't responded with pong within 10 seconds. This also sweeps for stale sessions where `isOpen() == false` and removes them from the broadcaster. Without this, proxies and firewalls can silently drop idle connections.
 
+### Root path routing and request filter fixes (2026-08-02)
+
+Four fixes that together make `@Action(path = "/")` and `RequestFilter` work correctly for the root path:
+
+1. **`@Action(path = "/")` now matches `GET /`** — `handleRequestMapping` tries endpoint matching **before** the `index.htm`/`index.html` fallback rewrite. When `contextPath` is empty (request to `/`), it also tries matching against `"/"` because `registerEndpoint` stores the root endpoint with key `"/"` (from `base + ""`). Previously the empty context path was rewritten to `/index.htm` before endpoint lookup, so root endpoints never matched.
+
+2. **`RequestFilter` runs for ALL requests** — filters are now invoked for every request, even those without a matching `@Action` endpoint. `EndpointInfo` is `null` when no endpoint matches, allowing filters to handle arbitrary paths (e.g. custom routing, auth gates). Previously `applyRequestFilters` was only called inside the `if (restAction != null)` branch, so unmatched paths bypassed all filters and went straight to 404.
+
+3. **Endpoints have priority over static file serving** — endpoint matching happens before the static document fallback. An `@Action(path = "/")` endpoint now wins over `web/index.html`. Previously the empty-path → `index.htm` rewrite happened first, so static files always shadowed root endpoints.
+
+4. **Directory paths no longer break endpoint matching** — `isRequestADocument()` now checks `checkFile.isFile()` in addition to `checkFile.exists()`. Previously a directory (e.g. `web/app/`) returned `true` for `exists()`, causing `Files.readAllBytes()` to throw `IOException: Is a directory` (500) instead of falling through to endpoint matching.
+
+**Test coverage:** `RestHttpServerRootPathTest` (5 tests) covers all four fixes.
+
 ## Production Readiness
 
 The project goal is moving from hobby project to production use — the author is using it to serve paying customer software. All changes and suggestions below must be evaluated through this lens.
