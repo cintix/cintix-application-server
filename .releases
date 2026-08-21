@@ -1,3 +1,4 @@
+3.3.0 | 2026-08-21 | minor | Security and hardning of GraphQL
 3.2.1 | 2026-08-02 | bugfix | 3.2.1 | 2026-08-02 | bugfix | Root path routing fixes — @Action(path = "/"), RequestFilter for unmatched paths
 3.2.0 | 2026-08-02 | minor | Erros regarding ActionPaths
 3.1.2 | 2026-06-19 | bugfix | Fixed variables in response
