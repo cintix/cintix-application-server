@@ -1,5 +1,6 @@
 package dk.cintix.application.server.modules.graphql.services.domain.parser;
 
+import dk.cintix.application.server.modules.graphql.services.domain.GraphQLException;
 import java.util.*;
 
 public class Lexer {
@@ -34,7 +35,7 @@ public class Lexer {
                             default: tokens.add(new Token(TokenType.NAME, name)); break;
                         }
                     } else {
-                        throw new RuntimeException("Unexpected char: " + c + " at " + pos);
+                        throw new GraphQLException("Unexpected char: " + c + " at " + pos);
                     }
             }
         }
@@ -48,7 +49,7 @@ public class Lexer {
         while (pos < text.length() && text.charAt(pos) != '"') {
             sb.append(text.charAt(pos++));
         }
-        if (pos >= text.length()) throw new RuntimeException("Unterminated string");
+        if (pos >= text.length()) throw new GraphQLException("Unterminated string");
         pos++; // skip closing "
         return sb.toString();
     }
