@@ -17,7 +17,7 @@ import java.util.logging.Logger;
 /**
  * Opt-in rate limiting with global defaults and per-endpoint overrides.
  *
- * <h3>Two-level configuration</h3>
+ * <h2>Two-level configuration</h2>
  * <ol>
  *   <li><b>Global default</b> — when {@link #setEnabled(boolean) enabled},
  *       all endpoints are rate-limited using {@link #setDefaultRequests(int)}
@@ -30,7 +30,7 @@ import java.util.logging.Logger;
  * <p>Rate limiting is <b>off by default</b>. Applications opt in by calling
  * {@code setEnabled(true)}.</p>
  *
- * <h3>Usage</h3>
+ * <h2>Usage</h2>
  * <pre>{@code
  *   RateLimitModuleService rateLimit = new RateLimitModuleService();
  *   rateLimit.setEnabled(true);

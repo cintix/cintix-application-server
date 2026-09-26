@@ -4,6 +4,8 @@
 Core Java sources live under `src/dk/cintix/application/server`, organized as modular feature/domain modules:
 - `modules/http/server` for REST routing, endpoint registration, request/response handling, static files, and WebSocket support.
 - `modules/graphql` for the GraphQL plugin contract, endpoint adapter, parser, executor, and registry.
+- `modules/openapi` for OpenAPI 3.0 spec generation and the Swagger UI endpoint.
+- `modules/mcp` for the Model Context Protocol JSON-RPC endpoint.
 - `modules/ratelimit` for the rate limit plugin and HTTP request filter.
 - `modules/scheduler` for the scheduler plugin and fixed-rate jobs.
 - `modules/database` for datasource/entity/connection management.
@@ -30,6 +32,8 @@ GraphQL query and mutation annotations live on the module contract:
 @GraphQLModule.Query("user")
 @GraphQLModule.Mutation("createOrder")
 ```
+
+`modules/openapi` and `modules/mcp` are **not** plugins. They do not implement `Plugin` and are absent from `META-INF/services`; they are handler objects attached in `RestHttpServer` through `enableOpenApi(...)` / `enableMcp(...)`, which call `addEndpoint("/api", ...)`. Do not add them to the `ServiceLoader` list.
 
 ## Modular Hybrid Architecture
 Use a modular monolith style that combines feature-module ownership, clean public contracts, hidden implementations, and pragmatic service orchestration.
@@ -118,25 +122,49 @@ Use these heuristics:
 
 ## Build, Test, and Development Commands
 Use Apache Ant from repo root:
-- `ant clean` removes `build/` artifacts.
-- `ant compile` compiles Java sources.
-- `ant test` runs unit tests from `test/`.
-- `ant jar` creates `dist/cintix-application-server.jar`.
-- `ant default` runs full build + tests (CI-friendly baseline).
-- `ant run` runs the configured main class from the project config.
 
-If you work in containers, review `Dockerfile` and `run-docker.sh` before localizing changes.
+| Command | Purpose |
+|---------|---------|
+| `ant clean` | Remove `build/` artifacts |
+| `ant compile` | Compile Java sources |
+| `ant compile-test` | Compile test sources |
+| `ant jar` | Create `dist/cintix-application-server.jar` |
+| `ant jar-with-dependencies` | Jar + bundled gson → `dist/cintix-application-server-all.jar` (default target) |
+| `ant test` | Compiles tests, then reports `No tests executed.` — the suite is not JUnit, so this runs nothing |
+| `ant default` | `test,jar,javadoc` — compiles, builds the jar and generates javadoc; runs no tests (the `test` target is a no-op for this suite) |
+| `ant run` | Runs `dk.cintix.application.server.Main`, a stub that only prints "library module. No standalone runtime is configured." |
+
+The suite is a plain-Java runner, not JUnit, so it is invoked directly:
+
+```bash
+ant compile-test && java -cp 'build/classes:build/test/classes:lib/*' dk.cintix.application.server.AllTests
+```
+
+A single test class:
+
+```bash
+ant compile-test && java -cp 'build/classes:build/test/classes:lib/*' dk.cintix.application.server.rest.http.RestHttpServerPathTest
+```
+
+Release with `./release.sh` (interactive) or `./release.sh minor "description"` — it bumps `.releases`, builds the fat jar, tags, pushes, and creates a GitHub release.
+
+The build compiles with `--release 8 -parameters` (the `-pre-compile` block in `build.xml`). `-parameters` is load-bearing: GraphQL, MCP, and REST argument binding all read `Parameter.getName()`, so compiling by hand without it silently breaks argument resolution at runtime.
+
+If you work in containers, review `Dockerfile` and `run.sh` before localizing changes (`run-docker.sh` is empty).
 
 ## Coding Style & Naming Conventions
-- Java 8 target (`javac.source=1.8`, `javac.target=1.8`).
+- Java 8 target (`javac.source=1.8`, `javac.target=1.8`), compiled with `--release 8` in `build.xml` for portability across JDK 8–25+.
 - Use 4-space indentation, UTF-8 encoding, and braces on all control blocks.
 - Keep package names lowercase (`dk.cintix...`), classes in `PascalCase`, methods/fields in `camelCase`, constants in `UPPER_SNAKE_CASE`.
 - Keep REST annotations and endpoint classes close to related HTTP logic in `rest/`.
 
 ## Testing Guidelines
 - Place tests in `test/` with matching package structure (example: `test/dk/cintix/application/server/rest/...`).
-- Name test classes `*Test.java`; test methods should describe behavior (example: `returns404WhenRouteMissing`).
-- Run `ant test` before opening a PR. Add regression tests for fixes in `rest`, `jdbc`, or SSL handling.
+- Name test classes `*Test.java`. Each is a plain class with a public `runAll()` that calls private, behavior-named test methods (`generatesSpecWithTitleAndVersion`, `internalServiceError_returnsInternalErrorWithoutDetails`), one assertion style throughout.
+- Assert with `TestSupport` (`assertTrue`, `assertFalse`, `assertEquals`, `assertArrayEquals`, `assertNull`) — there is no JUnit on the classpath. Add new helpers there rather than pulling in a framework.
+- Structure each test with explicit `// Arrange`, `// Act`, `// Assert` comment blocks.
+- **Register every new test class in `AllTests.main()`** (`test/dk/cintix/application/server/AllTests.java`). A class that is not listed there never runs, and neither `ant test` nor `ant default` will reveal the omission.
+- Run the suite with the `java -cp ...` command above before opening a PR. Add regression tests for fixes in `rest`, `jdbc`, or SSL handling.
 
 ## Commit & Pull Request Guidelines
 Recent history favors short, imperative commit subjects (examples: `removed debug`, `changed dependencies`). Prefer clearer variants like `Remove debug logging from RestHttpServer`.
@@ -144,5 +172,5 @@ Recent history favors short, imperative commit subjects (examples: `removed debu
 For pull requests:
 - Explain what changed and why.
 - Link related issues/tasks.
-- List verification steps and commands run (for example, `ant default`).
+- List verification steps and commands run (for example, `ant compile-test && java -cp 'build/classes:build/test/classes:lib/*' dk.cintix.application.server.AllTests`).
 - Include API behavior notes or sample request/response when endpoint behavior changes.

@@ -22,7 +22,7 @@ Apache Ant from repo root:
 | `ant jar` | Create `dist/cintix-application-server.jar` |
 | `ant jar-with-dependencies` | Jar + bundled gson (default target) |
 | `ant compile-test` | Compile test sources |
-| `ant test` | Compile test sources only (does not execute) |
+| `ant test` | Compiles tests, then prints `No tests executed.` — the suite is **not** JUnit, so this target runs nothing |
 
 **Run all tests:**
 ```bash
@@ -36,6 +36,8 @@ ant compile-test && java -cp 'build/classes:build/test/classes:lib/*' dk.cintix.
 
 Tests use a custom assertion framework in `TestSupport` (no JUnit); each test class has a `runAll()` method. `AllTests` is the test suite runner. Tests follow the AAA pattern with explicit `// Arrange`, `// Act`, `// Assert` comment blocks.
 
+**Adding a test class requires two edits:** create `test/dk/cintix/application/server/.../FooTest.java` with a `runAll()` method, *and* add `new FooTest().runAll();` to `AllTests.main()`. A test class that isn't wired into `AllTests` never runs in CI or locally.
+
 ## Architecture
 
 This is a lightweight, annotation-driven Java 8 REST application server built on `java.nio` (non-blocking I/O with `Selector`/`SocketChannel`). No servlet container or external framework.
@@ -48,12 +50,33 @@ This is a lightweight, annotation-driven Java 8 REST application server built on
 4. `RestAction.process()` invokes the matched method — injects `@Inject` fields, converts path/regex arguments to typed parameters via `ReflectionUtil.valueFromType()`, handles `@Cache`/`@Static`/`@CacheByStatus` caching
 5. A `Response` builder is returned and written back over the socket
 
+### Request-parsing pitfalls (read before touching `RestHttpRequest` / `HttpUtil`)
+
+These behaviours are **known-broken and still present in 3.3.0**. They are documented here because they are expensive to rediscover from a downstream symptom; they are not fixed.
+
+**1. Query strings and form fields are never URL-decoded.** `HttpUtil.parseQueryStrings()` (`HttpUtil.java:32`) and `HttpUtil.parsePostFields()` (`HttpUtil.java:13`) split on `&` / `=` and `trim()` the value, but nothing in `src/` calls `URLDecoder.decode()`. `%20`, `%C3%A6` and `+` arrive at the handler verbatim. Clients must pre-encode, or endpoints must decode themselves.
+
+**2. `!RAW` and form fields are truncated for multi-line bodies.** In `parsePostFields()` (`HttpUtil.java:16-21`):
+- `!RAW` is assembled with `rawRequest.append(requestLines[index])` and **no separator**, so line breaks are dropped;
+- the loop stops at `requestLines.length - 1`, so the **last body line is always lost**;
+- form fields are parsed only from `requestLines[linesProcessed]` — **the first body line**. Everything after it never becomes a field.
+
+A pretty-printed (multi-line) form-encoded or JSON body therefore produces a mangled `!RAW` and almost no fields. Prefer `request.getRawPost()`, which is sliced off the raw `\r\n\r\n` separator (`RestHttpServer.java:934-947`) and preserves the body as sent.
+
+**3. The body is read without honouring `Content-Length`.** `handleRead()` (`RestHttpServer.java:722`) does one `channel.read()` plus a best-effort `while (channel.read(...) > 0)` drain. On a non-blocking socket that loop returns `0` as soon as the currently-arrived segment is consumed, so a body split across TCP segments is parsed **truncated**, with no error and no retry — there is no request-completeness check. `MAX_BYTES` (5 MB) also truncates silently.
+
+`Content-Length` is **never parsed anywhere in the codebase** — the header is only ever *set* on the response side. The read buffer is a single shared `ByteBuffer.allocate(2048)` (`RestHttpServer.java:100`), so anything past the first 2 KB of a request arrives only if the opportunistic drain happens to catch it. Any endpoint that accepts a large body — notably a JSON-RPC `tools/call` payload — is unreliable today. Fixing this is a prerequisite for the MCP transport work below.
+
+**4. The request is decoded with the platform default charset.** `new String(bytes)` at `RestHttpServer.java:776` and `:790` — no `StandardCharsets.UTF_8`. Non-ASCII payloads (`æøå`) depend on the JVM default charset (UTF-8 on JDK 18+, platform-dependent before that).
+
+**5. Unmatched paths fall through to static serving (3.2.0+).** In 3.1.1 the endpoint miss branch ended in `else { return new Response().NotFound(); }` — a bare 404 with a **zero-length body**, and static files shadowed endpoints. Since 3.2.0 `handleRequestMapping` matches endpoints first, runs `RequestFilter`s for *every* request (endpoint `null` when nothing matched), then falls back to the document handler. `isRequestADocument()` checks `exists() && isFile()`, so a directory can no longer be served as a file. A "404 with an empty body" against an old build usually means this change has not been picked up.
+
 ### Annotation-driven routing
 
 Endpoints are registered via `server.addEndpoint(path, object)`. Methods use:
 - `@Action(path = "/...")` — marks a handler method
 - `@GET`, `@POST`, `@PUT`, `@DELETE` — HTTP method binding
-- `@Inject` — inject `RestHttpRequest` into endpoint fields
+- `@Inject` — inject `RestHttpRequest` into endpoint fields. **Only that one type is supported**: `RestActionService` (`:60-67`) checks `field.getType().equals(RestHttpRequest.class)` and silently ignores every other type. The field lives on the shared endpoint instance and is reassigned per request, so it is **not safe** to stash per-request state (a principal, a tenant) in an injected field — two worker threads will overwrite each other. Use `RestHttpRequest.addCustom()/getCustom()` for per-request state instead.
 - `@Cache`, `@Static`, `@CacheByStatus` — response caching strategies
 
 The regex router supports path parameters using `:paramName` → `([^/]+)` substitution.
@@ -70,16 +93,115 @@ The regex router supports path parameters using `:paramName` → `([^/]+)` subst
 
 ### Key packages
 
-- `modules/http/server/` — HTTP module contract, NIO server loop, request parsing, endpoint registration, static files, WebSocket support
-- `modules/http/server/services/` — REST action dispatch, JSON service description, response models, model generators
+- `modules/http/server/` — `HttpModule` contract, NIO server loop (`RestHttpServer`), request parsing (`RestHttpRequest`, `HttpUtil`), endpoint registration, static files, WebSocket
+- `modules/http/server/endpoint/events/` — `HttpConnectionEvents`, `HttpRequestEvents`, `HttpNotificationEvents` hooks
+- `modules/http/server/services/` — `RestActionService` (dispatch), `JsonServiceDescriptionEngine`, `WebSocketService`, `Response`/model generators
 - `modules/graphql/` — GraphQL plugin contract; register endpoints with `graphql.addEndpoint(...)`
-- `modules/graphql/endpoint/` — HTTP adapter for GraphQL POST requests
-- `modules/graphql/services/domain/` — GraphQL lexer/parser/AST/executor/registry internals
+- `modules/openapi/` — OpenAPI 3.0 spec generation + Swagger UI; enabled with `server.enableOpenApi(...)`
+- `modules/mcp/` — Model Context Protocol JSON-RPC endpoint; enabled with `server.enableMcp(...)`
 - `modules/ratelimit/` — rate limit plugin and `@RateLimitModule.RateLimit`
 - `modules/scheduler/` — scheduler plugin and fixed-rate jobs
 - `modules/database/` — `EntityManager` (annotation-based ORM), `PooledDataSource`, `TransactionableConnection`, `DataSourceManager` (JNDI lookup)
 - `modules/security/` — `SSLContextManager` loads JKS keystore, creates TLS context
-- `infrastructure/` — `ReflectionUtil`, `Cache`, `ByteMemoryStream`, REST annotations, plugin contracts, `ModuleRegistry`
+- `infrastructure/` — `ReflectionUtil`, `Cache`, `ByteMemoryStream`, annotation definitions (REST, API-doc, MCP, WebSocket), plugin contracts, `ModuleRegistry`
+
+**OpenAPI and MCP are not plugins.** Unlike GraphQL/ratelimit/scheduler, they do not implement `Plugin` and are not in `META-INF/services`. They are plain handler classes attached in `RestHttpServer` with `addEndpoint("/api", new OpenApiEndpoint(...))` / `new McpEndpoint(...)`, rendering their own module-internal endpoints.
+
+### OpenAPI (`enableOpenApi`)
+
+```java
+server.enableOpenApi("My API", "1.0.0");                                  // cookie auth (default)
+server.enableOpenApi("My API", "1.0.0", "bearer", User.class, Project.class);
+```
+
+Registers `OpenApiEndpoint` under `/api` → `GET /api/openapi.json` (spec) and `GET /api/docs` (Swagger UI). `OpenApiService.generate()` is a pure builder over the frozen `getRegisteredEndpoints()` map, emitting `openapi: 3.0.3`; it skips regex keys (those starting with `^`).
+
+- **Security scheme**: `"cookie"` → `cookieAuth` (apiKey in cookie `session`); `"bearer"` → `bearerAuth` (HTTP bearer, JWT). Any other value falls back to cookie.
+- **Tag precedence**: `@ApiDoc.tag` > `@ApiTag.name` > class simple name minus a trailing `"Endpoint"`.
+- **Body parameters** are the method parameters *after* the count of `{placeholders}` in the `@Action` path; a request body is only emitted for POST/PUT. `@ApiDoc.example` (a JSON string) overrides the generated example.
+- **`components.schemas`** come from `schemaClasses` carrying `@ApiSchema`; with none supplied a placeholder `body` object is emitted.
+
+### MCP (`enableMcp`)
+
+```java
+server.enableMcp(new MyToolHandler());   // explicit handlers, plus auto-discovery
+```
+
+Registers `McpEndpoint` under `/api` → `POST /api/mcp`, a **JSON-RPC 2.0** endpoint reporting protocol version `2024-11-05`. No SSE, no batching, no GET streaming.
+
+- **Methods**: `initialize`, `tools/list`, `tools/call`, `resources/list` (always returns an empty array). Anything else → `-32601`.
+- **Tool discovery has two paths**: the explicit varargs handlers, plus `registry.scanRegisteredEndpoints(getRegisteredEndpoints())`, which picks up `@McpTool` methods on objects already registered via `addEndpoint`.
+- **Argument binding** matches JSON keys to `Parameter.getName()` and converts with `ReflectionUtil.valueFromType()`, so argument names depend on the `-parameters` compiler flag (see below). Complex types fall back to the raw `Map`/`List` value.
+- **Known rough edge**: `McpDispatcher.errorInResult(code, message)` ignores both arguments and always returns `{"result":{"content":[],"isError":true}}` — the error code and message never reach the client, so tool-name and invocation failures are indistinguishable. `@McpResource` is declared but referenced nowhere.
+
+#### Protocol status and next-version backlog
+
+The module reports protocol version **`2024-11-05`**, hard-coded at `McpDispatcher.java:16`, and the string is asserted in `McpDispatcherTest.java:121`. That is three revisions behind: `2025-03-26`, `2025-06-18`, `2025-11-25`, `2026-07-28`.
+
+The target is **dual-era Streamable HTTP** on the one `/api/mcp` endpoint, detected per request — the spec explicitly sanctions serving both eras concurrently:
+
+- **Legacy (≤ `2025-11-25`)** — `initialize` handshake, server-minted `Mcp-Session-Id` on the response, echoed on every later request, terminated with HTTP `DELETE`; `404` for an unknown/expired session, `400` for a missing one.
+- **Modern (`2026-07-28`)** — fully stateless: no sessions, no `initialize`. Each request carries its version and capabilities in `_meta` (`io.modelcontextprotocol/protocolVersion`, `…/clientCapabilities`, `…/clientInfo`); required headers `MCP-Protocol-Version`, `Mcp-Method`, and `Mcp-Name` (for `tools/call`/`resources/read`/`prompts/get`) must be validated against the body and rejected with `400` + `HeaderMismatch (-32020)` on mismatch; unknown versions get `UnsupportedProtocolVersionError (-32022)` carrying a `supported` list; `server/discover` is mandatory; every result carries `resultType`; and list results carry `ttlMs`/`cacheScope`. A modern-only server answers `405` to GET/DELETE at the MCP endpoint and ignores `Mcp-Session-Id`.
+
+Defects the modernization must fix in the same pass, all in `McpDispatcher`:
+
+- **`errorInResult` swallows every failure** (`:184-188`). A failed `tools/call` is reported as a **successful** JSON-RPC response with empty `content` — missing tool name, unknown tool, and invocation failure are indistinguishable.
+- **Numeric tool arguments do not bind.** Gson 2.8.6 deserializes JSON numbers to `Double`, so `String.valueOf` yields `"3.0"`, `Integer.parseInt` throws in `invokeTool` (`:149-160`), and the fallback passes the `Double` into `method.invoke` → `IllegalArgumentException: argument type mismatch`. Only `String` params are covered by tests.
+- **`@McpParam(name = …)` is a latent mismatch** — the custom name is used in `tools/list` (`McpRegistry.java:60-61`) but binding looks up the Java parameter name (`:141`), which depends on `-parameters`.
+- **Notifications get a response body.** Requests without `id` should get `202 Accepted` and no body.
+- **`resources/*` is unimplemented** — `resources/list` always returns an empty array and `@McpResource` is dead code.
+
+Two transport prerequisites, both covered in [Request-parsing pitfalls](#request-parsing-pitfalls-read-before-touching-resthttprequest--httputil): `Content-Length` is never parsed anywhere in the codebase, and the read buffer is `ByteBuffer.allocate(2048)` (`RestHttpServer.java:100`). A Streamable HTTP transport is one POST per message, routinely carrying large `tools/call` payloads — so the body path must be fixed before the transport can be reliable.
+
+**SSE is not reachable without new plumbing.** Endpoints have no access to `SocketChannel` or `SelectionKey` — they only return a `Response`, and `Response.chunked()` buffers the entire body and writes it in one shot. The WebSocket stack is the only real streaming path in the codebase. A long-lived stream would additionally be killed by the 30s request timeout and the 60s idle sweep unless explicitly exempted via `@Timeout(ms = 0)` and the idle-connection sweep. Deferring SSE is compliant: the spec lets the server answer a request with a single `application/json` object instead of `text/event-stream`.
+
+### Authentication — does not exist yet
+
+There is **no authentication or authorization anywhere in this repo**. No JWT, no token parsing, no HMAC or signature verification, no principal concept. The only occurrence of the word `bearer` in `src/` is `OpenApiService`, which merely *documents* a `bearerAuth` security scheme in the generated spec — it enforces nothing.
+
+- `modules/security/` is **TLS only** — `SSLContextManager` / `SSLCertificateManager` load a JKS keystore and build a context. No identity, no access control.
+- `lib/` is exactly three jars: `gson-2.8.6`, `postgresql-42.2.8`, `cintix-html-engine`. There is no crypto or OAuth library to build on.
+
+**Decided direction (not yet implemented): pure JDK, no new dependency.**
+
+- HS256 — `javax.crypto.Mac` (`HmacSHA256`) over `header.payload`, compared with `MessageDigest.isEqual()` (constant time), base64url via `java.util.Base64.getUrlDecoder()`.
+- RS256/ES256 — `java.security.Signature` against a JWKS fetched with the existing `infrastructure/HTTPRestClient`, cached with the module's `ttlMs`-style refresh.
+- `HttpModule.RequestFilter` is the hook; `RateLimitModuleService.java:106-112` is the working pattern to copy. Returning `null` passes the request through.
+- `Response.Unauthorized()` (`:108`), `Response.Forbidden()` (`:113`) and `Response.header(String, String)` (`:168`) already exist, so `WWW-Authenticate` can be emitted today.
+
+**Spec requirements if this is used to protect the MCP endpoint** (MCP authorization is a profile of OAuth 2.1, and it is what JWT-bearing clients will expect):
+
+- Serve protected-resource metadata at `/.well-known/oauth-protected-resource` (RFC 9728).
+- Answer unauthenticated requests with `401` **and** `WWW-Authenticate: Bearer resource_metadata="…", scope="…"`; answer authenticated-but-unauthorized requests with `403` and `error="insufficient_scope"`.
+- Validate the token's **audience** (RFC 8707) against this server's resource identifier.
+- Accept the token only in the `Authorization: Bearer` header — **never** from a query string, which would leak it into access logs.
+
+**Configuration gap:** there is no environment-variable or config-file loading anywhere. `Application.getConfigFolder()` (`Application.java:54`, returns `./conf`) is declared but **never called** — a signing key or JWKS URL has nowhere to live today. The precedent for credentialed config in this codebase is JNDI (`DataSourceManager` for the database); extending that, or giving `getConfigFolder()` its first real caller, is the decision to make before implementation.
+
+### GraphQL module
+
+Pipeline: `endpoint/GraphQLEndpoint` → `services/domain/parser/Lexer` → `Parser` → `services/domain/ast/*` → `services/domain/execution/Executor` → `services/domain/registry/GraphQLRegistry`.
+
+`GraphQLModuleService.addEndpoint(path, services...)` wraps the service objects in a `GraphQLEndpoint` (a `@POST @Action(path = "/")` handler) and registers it at `path`. Operations are discovered by reflecting over each service's declared methods for `@GraphQLModule.Query("fieldName")` / `@GraphQLModule.Mutation("fieldName")` — the annotation value is the GraphQL field name, the Java method name is irrelevant.
+
+**Hardened in 3.3.0** (`Parser.java`, `Executor.java`, `GraphQLEndpoint.java`):
+
+| Rule | Value / behaviour | Where |
+|------|-------------------|-------|
+| Max nesting depth | `DEFAULT_MAX_DEPTH = 10` (depth starts at 1) | `Parser.java:8`, enforced `:69` |
+| Max selections | `DEFAULT_MAX_SELECTIONS = 100`, counted **cumulatively across the document**, not per level | `Parser.java:9`, enforced `:93` |
+| Syntax errors | throw `GraphQLException` → **400** with the message verbatim | `Lexer`, `Parser` |
+| Unknown field / bad argument | `GraphQLException` → **400** (`Unknown argument "x" for <field>`, `Missing argument "x" for <field>`) | `Executor.mapArguments` |
+| Service-side failure | unwrapped, logged SEVERE, rethrown as a **plain** `RuntimeException` → **500** with the fixed string `Internal server error` | `Executor.java:35-38` |
+
+**Error contract — do not break it:** `GraphQLException` is the *client-safe* channel (400, message echoed). Any other exception is a 500 with a generic body, so a service throwing a raw exception never leaks internals. Never throw `GraphQLException` from service code to report a server-side failure. Error bodies are `{"errors":[{"message":"..."}]}` (deterministic key order); success is the **bare** result map — there is no `{"data": ...}` envelope.
+
+**Constraints to respect:**
+
+- **`-parameters` is load-bearing** — `Executor.mapArguments` binds via `Parameter.getName()`. See [Java 8 target](#java-8-target); dropping the flag turns every GraphQL argument into `Missing argument`.
+- **One endpoint per path.** `registerEndpoint` keys `pathMapping` by verb + path, so a second `addEndpoint` on the same path overwrites the first.
+- **Small language subset**: a single unnamed operation per document; no variables (`$`), directives (`@`), fragments, aliases, or introspection (`__schema` fails as `Unknown operation`). `Lexer.readNumber()` consumes digits only, so negative and fractional literals (`-1`, `1.5`) are rejected with `Unexpected char`.
+- **Projection is the only field-level redaction**, and it only applies when the caller supplies sub-selections. `Executor.projectSubSelection` returns the object **as-is** when the selection has no sub-fields, so `{ user(id: "1") }` serializes the whole POJO — always nest braces for anything carrying sensitive fields.
 
 ### Static file serving
 
@@ -102,6 +224,8 @@ Query strings from the upgrade request are copied to session attributes with a `
 Source and target are Java 1.8 (`javac.source=1.8`, `javac.target=1.8`). No lambdas/streams used extensively — reflection-heavy patterns for annotation processing and dependency injection.
 
 To produce portable bytecode that runs on any Java 8 through 25+ JRE, the build uses `--release 8` (configured in `build.xml`). This ensures covariant return types like `ByteBuffer.clear()` resolve to Java 8 signatures regardless of which JDK version performs the compilation.
+
+The same `-pre-compile` block in `build.xml` passes **`-parameters`**, which is what makes `Parameter.getName()` return real parameter names rather than `arg0`. GraphQL argument binding (`Executor.mapArguments`), MCP tool arguments (`McpDispatcher.invokeTool`) and `RestActionService` all depend on it — removing the flag breaks argument resolution silently at runtime. Building with `javac` by hand instead of Ant reproduces that failure.
 
 ## Plugin Architecture
 
@@ -168,6 +292,26 @@ Loaded via `java.util.ServiceLoader` in `ModuleRegistry.loadPlugins(httpModule)`
 - Cross-plugin dependencies (e.g. auth needs database) require careful design
 
 ## Recent Changes
+
+### GraphQL security hardening (2026-08-21, v3.3.0)
+
+Commit `2893f5e` — 6 files, +476/−53. Before this, *any* exception message was echoed to the client as a 400, so internal failures leaked. Added `GraphQLException` as the client-safe (400) channel; everything else is a generic 500. Added parser limits (depth 10, 100 selections cumulative) and strict typed argument validation/marshalling in `Executor` (`Missing argument`, `Unknown argument`, `must be a string|integer|decimal number`, enum and POJO conversion with unknown-field rejection). `InvocationTargetException` from a service is unwrapped, logged SEVERE, and rethrown as a plain `RuntimeException` so it maps to 500. Projection now throws `Unknown field` instead of silently dropping. See the GraphQL module section above for the contract.
+
+### SocketException on client reset (2026-06-07, v3.1.1)
+
+`handleRead()` catches `IOException` during read, logs at FINER and disconnects — previously a client reset spun the read path and spammed SEVERE logs.
+
+### OpenAPI request-body schemas + `@ApiParam`/`@ApiSchema` (2026-06-06, v3.1.0)
+
+Auto-generated request body JSON Schema with `properties` and `example` derived from the method's body parameters (all parameters after the path placeholders). `@ApiParam` enriches each property (description, optional type override); `@ApiDoc.example` overrides the generated example. Configurable security scheme (`"cookie"` default, `"bearer"`). Tag resolution changed to `@ApiDoc.tag` > `@ApiTag.name` > class name — the old path-prefix guessing is gone.
+
+### OpenAPI + MCP (2026-06-05, v3.0.0)
+
+Added the `modules/openapi` and `modules/mcp` packages, `enableOpenApi(...)` / `enableMcp(...)` on `RestHttpServer`, and the `@ApiDoc`/`@ApiTag`/`@ApiParam`/`@ApiSchema`/`@McpTool`/`@McpParam`/`@McpResource` annotations. Neither is a `Plugin` — both attach plain handler objects via `addEndpoint("/api", ...)`.
+
+### Path parameter and variable fixes (2026-06-05, v3.0.2)
+
+`cintix-html-engine` `@value` tag now resolves `@variables` without the `@` prefix; `{id}` path parameters compile to a non-greedy `([^/]+)`.
 
 ### Request timeout (2026-05-30)
 

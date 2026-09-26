@@ -94,7 +94,7 @@ public class MyEndpoints {
 | Feature | Description |
 |---------|-------------|
 | **OpenAPI 3.0** | `server.enableOpenApi("My API", "1.0")` — auto-generates spec from registered endpoints. `@ApiDoc`/`@ApiTag`/`@ApiParam`/`@ApiSchema` for metadata. Serves `/api/openapi.json` + Swagger UI at `/api/docs` |
-| **MCP** | `server.enableMcp(handlers...)` — JSON-RPC 2.0 at `POST /api/mcp`. `@McpTool`/`@McpParam` annotations. Auto-discovers tools from endpoint classes |
+| **MCP** | `server.enableMcp(handlers...)` — JSON-RPC 2.0 at `POST /api/mcp`. `@McpTool`/`@McpParam` annotations. Auto-discovers tools from endpoint classes. Reports protocol version `2024-11-05`; transport modernization (Streamable HTTP, stateless + session-based) is scheduled for the next release |
 
 ```java
 // OpenAPI — one line (cookie auth default)
@@ -199,6 +199,8 @@ src/dk/cintix/application/server/
       endpoint/           RestHttpServer, RestHttpRequest, HealthCheck, WebSocketFrame
       services/           RestActionService, WebSocketService, Response, JSON generators
     graphql/              GraphQL plugin — lexer, parser, AST, executor, endpoint adapter
+    openapi/              OpenAPI 3.0 spec generation + Swagger UI endpoint
+    mcp/                  Model Context Protocol JSON-RPC endpoint
     ratelimit/            Rate limit plugin — @RateLimit annotation, request filter
     scheduler/            Scheduler plugin — fixed-rate job execution
     database/             PooledDataSource, EntityManager, TransactionableConnection
@@ -260,7 +262,8 @@ These are "next level" improvements — the server is production-ready without t
 | **Streaming chunked encoding** | Current `Response.chunked()` buffers full body. True streaming would enable incremental writes. |
 | **WebSocket permessage-deflate** | Compression extension for WebSocket frames. |
 | **CORS plugin** | `@CrossOrigin` annotation, header injection as a plugin. |
-| **Auth plugin** | `@Authenticated`, JWT validation, OAuth2 client. |
+| **MCP Streamable HTTP** | Move `POST /api/mcp` off protocol `2024-11-05` to a dual-era Streamable HTTP transport: session-based (`initialize` + `Mcp-Session-Id`) served alongside fully stateless requests (`_meta` per request, `MCP-Protocol-Version`/`Mcp-Method`/`Mcp-Name` headers, `server/discover`), auto-detected per request. Requires fixing request-body reading first (`Content-Length` is currently ignored and the read buffer is 2 KB). |
+| **Auth plugin** | JWT validation and an `@Authenticated` gate, implemented as a `RequestFilter`. Pure JDK (HS256 via `Mac`, RS256/ES256 via `Signature` against a JWKS) — no new dependency. MCP's OAuth profile adds `/.well-known/oauth-protected-resource` (RFC 9728), `401` with `WWW-Authenticate: Bearer`, and audience validation (RFC 8707). |
 | **Metrics** | Prometheus `/metrics` endpoint — request counts, latency histograms, active connections. |
 | **Multipart upload** | `@Upload` annotation, stream files to disk. |
 | **Redis caching** | `@Cache` backed by Redis instead of in-memory. |
