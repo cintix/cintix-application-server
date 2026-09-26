@@ -255,9 +255,12 @@ main() {
 
     confirm
 
-    build_jar
+    # Every source edit must happen before the build, so the jar carries the
+    # version it is actually being released as. Building first used to embed
+    # the previous release's version in the Server: header.
     update_releases_file
     update_response_version
+    build_jar
     git_commit_tag_push
     github_release
 

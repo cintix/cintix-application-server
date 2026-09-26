@@ -43,13 +43,14 @@ public class MyEndpoints {
 | **Server-page rendering** | `.html`/`.htm` files processed through `cintix-html-engine` with request parameter merging |
 | **JSON & text generators** | Built-in `application/json` and `text/plain` model generators — pluggable via `registerModelGenerator()` |
 | **Response caching** | `@Cache`, `@Static`, `@CacheByStatus` annotations with in-memory TTL-based caching |
+| **Request parsing** | Query strings and form fields are URL-decoded (`+` means a space, malformed escapes pass through unchanged). Bodies are assembled by `Content-Length` across as many reads as needed, up to 5 MB — over that the server answers `413` instead of truncating |
 
 ### Production
 
 | Feature | Description |
 |---------|-------------|
 | **Worker-thread pool** | Configurable `ThreadPoolExecutor` — slow endpoints don't block other clients. Back-pressure: `503 Service Unavailable` when queue is full |
-| **Connection pooling** | `PooledDataSource` with dynamic sizing (default 5→20), borrow validation, idle eviction, max lifetime |
+| **Connection pooling** | `PooledDataSource` with dynamic sizing (default 5→20), borrow validation, idle eviction, max lifetime. Hands out logical handles, so the standard `try (Connection c = ds.getConnection())` form returns the connection to the pool |
 | **Graceful shutdown** | 6-phase drain: stop accept → drain workers → flush writes → close connections → release resources |
 | **Health checks** | `GET /health` bypasses worker pool. Pluggable probes. Returns `200` (UP) or `503` (DOWN) with JSON status |
 | **Rate limiting** | Opt-in, two-level: global defaults + `@RateLimit` per-endpoint annotation. `requests=0` whitelists an endpoint |
@@ -180,6 +181,27 @@ ModuleRegistry.initialize(server, rateLimit);
 // No annotation → uses global default (30s)
 ```
 
+## Upgrading to 3.5.0
+
+3.5.0 fixes request parsing, which changes two things a client can notice. Both
+are corrections — the old behaviour was the bug — but they are worth checking
+against your own clients:
+
+- **`+` in a query string or form body is now a space**, matching browsers,
+  Spring and PHP. A literal `+` — base64 or a signature, typically — must be
+  sent as `%2B`.
+- **Form fields and query values are percent-decoded.** Clients that were
+  pre-encoding to work around the old behaviour are unaffected; clients that
+  relied on receiving `%20` verbatim are not.
+
+Related, and worth knowing if you use the connection pool: `PooledDataSource`
+now hands out a logical handle, so `try (Connection c = dataSource.getConnection())`
+returns the connection to the pool as JDBC requires. Before 3.5.0 that form
+closed the socket while leaving the connection in the pool's active list
+permanently, and the pool failed with `Connection pool exhausted` after
+`maxPoolSize` lookups. `releaseConnection()` still works and accepts either the
+handle or the raw connection.
+
 ## Build & Run
 
 ```bash
@@ -262,7 +284,7 @@ These are "next level" improvements — the server is production-ready without t
 | **Streaming chunked encoding** | Current `Response.chunked()` buffers full body. True streaming would enable incremental writes. |
 | **WebSocket permessage-deflate** | Compression extension for WebSocket frames. |
 | **CORS plugin** | `@CrossOrigin` annotation, header injection as a plugin. |
-| **MCP Streamable HTTP** | Move `POST /api/mcp` off protocol `2024-11-05` to a dual-era Streamable HTTP transport: session-based (`initialize` + `Mcp-Session-Id`) served alongside fully stateless requests (`_meta` per request, `MCP-Protocol-Version`/`Mcp-Method`/`Mcp-Name` headers, `server/discover`), auto-detected per request. Requires fixing request-body reading first (`Content-Length` is currently ignored and the read buffer is 2 KB). |
+| **MCP Streamable HTTP** | Move `POST /api/mcp` off protocol `2024-11-05` to a dual-era Streamable HTTP transport: session-based (`initialize` + `Mcp-Session-Id`) served alongside fully stateless requests (`_meta` per request, `MCP-Protocol-Version`/`Mcp-Method`/`Mcp-Name` headers, `server/discover`), auto-detected per request. The request-body path it depends on (large bodies, split across TCP segments) was fixed in 3.5.0. |
 | **Auth plugin** | JWT validation and an `@Authenticated` gate, implemented as a `RequestFilter`. Pure JDK (HS256 via `Mac`, RS256/ES256 via `Signature` against a JWKS) — no new dependency. MCP's OAuth profile adds `/.well-known/oauth-protected-resource` (RFC 9728), `401` with `WWW-Authenticate: Bearer`, and audience validation (RFC 8707). |
 | **Metrics** | Prometheus `/metrics` endpoint — request counts, latency histograms, active connections. |
 | **Multipart upload** | `@Upload` annotation, stream files to disk. |

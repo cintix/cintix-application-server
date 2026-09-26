@@ -187,17 +187,23 @@ public class PooledDataSource implements javax.sql.DataSource {
     /**
      * Releases a connection back to the pool. Idempotent — if the connection
      * is already closed, this is a no-op.
+     *
+     * <p>Accepts either the handle returned by {@link #getConnection()} or the
+     * underlying physical connection, so callers may use
+     * {@code try (Connection c = dataSource.getConnection())} and let
+     * {@code close()} do the work.</p>
      */
     public boolean releaseConnection(Connection connection) {
-        if (connection == null) {
+        Connection physical = PooledConnectionHandler.unwrap(connection);
+        if (physical == null) {
             return false;
         }
         synchronized (this) {
-            boolean removed = activeConnections.remove(connection);
+            boolean removed = activeConnections.remove(physical);
             if (!removed) {
                 return false;
             }
-            idlePool.add(connection);
+            idlePool.add(physical);
             this.notifyAll();
             return true;
         }
@@ -219,7 +225,7 @@ public class PooledDataSource implements javax.sql.DataSource {
                     Connection conn = idlePool.remove(idlePool.size() - 1);
                     if (isConnectionValid(conn)) {
                         activeConnections.add(conn);
-                        return conn;
+                        return PooledConnectionHandler.wrap(this, conn);
                     }
                     // Stale connection — discard and try the next one
                     closeQuietly(conn);
@@ -232,7 +238,7 @@ public class PooledDataSource implements javax.sql.DataSource {
                         Connection conn = DriverManager.getConnection(url, user, password);
                         activeConnections.add(conn);
                         logger.log(Level.FINE, "Pool grown to {0} connections", currentTotal + 1);
-                        return conn;
+                        return PooledConnectionHandler.wrap(this, conn);
                     } catch (SQLException e) {
                         logger.log(Level.WARNING, "Failed to create new connection for pool growth", e);
                         // Fall through to wait logic

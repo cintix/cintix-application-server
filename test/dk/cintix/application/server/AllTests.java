@@ -14,7 +14,10 @@ import dk.cintix.application.server.rest.http.ServerPagePropertyMergeTest;
 import dk.cintix.application.server.rest.http.RestHttpServerKeepAliveTest;
 import dk.cintix.application.server.rest.http.McpDispatcherTest;
 import dk.cintix.application.server.rest.http.OpenApiServiceTest;
+import dk.cintix.application.server.rest.http.RequestAccumulatorTest;
+import dk.cintix.application.server.rest.http.ResponseHeaderTest;
 import dk.cintix.application.server.rest.http.RestHttpServerPathTest;
+import dk.cintix.application.server.rest.http.RestHttpServerSplitRequestBodyTest;
 import dk.cintix.application.server.rest.http.RestHttpServerHealthCheckTest;
 import dk.cintix.application.server.rest.http.RestHttpServerHttp11ComplianceTest;
 import dk.cintix.application.server.rest.http.RestHttpServerRootPathTest;
@@ -26,7 +29,11 @@ import dk.cintix.application.server.web.MimeTypesTest;
 public class AllTests {
 
     public static void main(String[] args) throws Exception {
+        new ReleaseScriptTest().runAll();
         new HttpUtilTest().runAll();
+        new RequestAccumulatorTest().runAll();
+        new ResponseHeaderTest().runAll();
+        new RestHttpServerSplitRequestBodyTest().runAll();
         new RestHttpRequestHeaderTest().runAll();
         new RestActionServiceMixedParamsTest().runAll();
         new WebSocketQueryStringTest().runAll();

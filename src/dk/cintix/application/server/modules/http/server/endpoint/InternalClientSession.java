@@ -14,6 +14,7 @@ public class InternalClientSession {
     private String sessionId;
     private Response response;
     private ByteBuffer writeBuffer;
+    private RequestAccumulator readAccumulator;
     private final Map<String, Object> keys = new LinkedHashMap<>();
 
     public InternalClientSession() {
@@ -46,6 +47,29 @@ public class InternalClientSession {
 
     public void add(String key, Object obj) {
         keys.put(key, obj);
+    }
+
+    /**
+     * The in-flight request buffer for this connection, created on first use.
+     *
+     * <p>It lives on the session so that a request split across several reads
+     * keeps accumulating rather than being parsed truncated. {@code handleWrite}
+     * replaces the session object before the connection is re-registered for
+     * reading, so the buffer naturally belongs to exactly one request.</p>
+     */
+    RequestAccumulator getReadAccumulator() {
+        if (readAccumulator == null) {
+            readAccumulator = new RequestAccumulator();
+        }
+        return readAccumulator;
+    }
+
+    /**
+     * Drops the buffered request bytes. Called once the request has been parsed
+     * so the memory is released before the response is written.
+     */
+    void clearReadAccumulator() {
+        readAccumulator = null;
     }
 
     public ByteBuffer getWriteBuffer() {

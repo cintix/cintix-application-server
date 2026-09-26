@@ -38,6 +38,7 @@ import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -98,6 +99,13 @@ public abstract class RestHttpServer implements HttpModule {
     private volatile int defaultRequestTimeoutMs = 30_000;
     private volatile int idleReadTimeoutMs = 60_000;
     private final ByteBuffer dataBuffer = ByteBuffer.allocate(2048);
+
+    /**
+     * Largest request this server will buffer before answering 413. Applied to
+     * the accumulated request, not to a single read, so a body larger than the
+     * 2 KB read buffer is fine up to this limit.
+     */
+    private static final int MAX_REQUEST_BYTES = 1024 * 1024 * 5; // 5MB
     private String documentRoot = "web";
     private ExecutorService workerPool;
     private final ConcurrentLinkedQueue<SelectionKey> completionQueue = new ConcurrentLinkedQueue<>();
@@ -746,59 +754,68 @@ public abstract class RestHttpServer implements HttpModule {
             return;
         }
 
+        // A request may arrive over several reads: headers in one segment, body
+        // in the next. Buffer until the whole request is present rather than
+        // parsing the first segment and silently losing the rest.
+        RequestAccumulator accumulated = clientSession.getReadAccumulator();
         dataBuffer.clear();
-        String data = null;
-
-        int read;
-        int totalRead = 0;
-        int MAX_BYTES = 1024 * 1024 * 5; // 5MB
 
         int readResult;
         try {
             readResult = client.read(dataBuffer);
+            while (readResult > 0) {
+                dataBuffer.flip();
+                byte[] chunk = new byte[dataBuffer.limit()];
+                dataBuffer.get(chunk);
+                dataBuffer.clear();
+                accumulated.append(chunk);
+
+                if (accumulated.size() > MAX_REQUEST_BYTES) {
+                    // Refuse rather than hand an endpoint a truncated body.
+                    Response tooLarge = new Response().PayloadTooLarge()
+                            .data("Request exceeds " + MAX_REQUEST_BYTES + " bytes");
+                    InternalClientSession tooLargeSession = new InternalClientSession(
+                            clientSession.getSessionId(), tooLarge);
+                    key.interestOps(SelectionKey.OP_WRITE);
+                    key.attach(tooLargeSession);
+                    return;
+                }
+                if (accumulated.isComplete()) {
+                    break;
+                }
+                readResult = client.read(dataBuffer);
+            }
         } catch (IOException e) {
             logger.log(Level.FINER, "Client reset connection during read: {0}", e.getMessage());
             handleDisconnect(key);
             return;
         }
-        if (readResult == -1) {
-            handleDisconnect(key);
-            return;
-        }
-        if (readResult == 0) {
-            return;
-        }
 
-        totalRead += readResult;
-        dataBuffer.flip();
-        byte[] bytes = new byte[dataBuffer.limit()];
-        dataBuffer.get(bytes);
-        data = new String(bytes);
-        dataBuffer.clear();
-
-        // Read any additional available data
-        try {
-            while ((read = client.read(dataBuffer)) > 0) {
-                totalRead += read;
-                if (totalRead > MAX_BYTES) {
-                    break;
-                }
-
-                dataBuffer.flip();
-                bytes = new byte[dataBuffer.limit()];
-                dataBuffer.get(bytes);
-                data += new String(bytes);
-                dataBuffer.clear();
-            }
-        } catch (IOException e) {
-            logger.log(Level.FINER, "Client reset connection during additional read: {0}", e.getMessage());
+        if (readResult == -1 && !accumulated.isComplete()) {
+            // Peer half-closed with a partial request: no more bytes can ever
+            // arrive, so waiting would spin on the EOF.
             handleDisconnect(key);
             return;
         }
 
-        if (data != null && data.length() > 0) {
+        if (accumulated.isEmpty()) {
+            return;
+        }
+
+        // Refresh the idle timer for every segment — a slow upload that is
+        // still making progress must not be swept away as idle.
+        clientSession.add("last-read-time", System.currentTimeMillis());
+
+        if (!accumulated.isComplete()) {
+            // Partial request; stay registered for OP_READ and wait for more.
+            return;
+        }
+
+        String data = new String(accumulated.toByteArray(), StandardCharsets.UTF_8);
+        clientSession.clearReadAccumulator();
+
+        if (data.length() > 0) {
             notifyEvent(data);
-            clientSession.add("last-read-time", System.currentTimeMillis());
             RestHttpRequest request = parseRequest(restClient, client, data);
 
             // Health check bypass — runs inline on event loop, no worker pool

@@ -50,24 +50,63 @@ This is a lightweight, annotation-driven Java 8 REST application server built on
 4. `RestAction.process()` invokes the matched method — injects `@Inject` fields, converts path/regex arguments to typed parameters via `ReflectionUtil.valueFromType()`, handles `@Cache`/`@Static`/`@CacheByStatus` caching
 5. A `Response` builder is returned and written back over the socket
 
-### Request-parsing pitfalls (read before touching `RestHttpRequest` / `HttpUtil`)
+### Request parsing
 
-These behaviours are **known-broken and still present in 3.3.0**. They are documented here because they are expensive to rediscover from a downstream symptom; they are not fixed.
+**Pitfalls 1–4 below were fixed in 3.5.0.** They are kept here because the
+symptom each one produced is still what an older build looks like, and because
+the client-side workarounds that were mandatory before 3.5.0 are still the
+workarounds to reach for when diagnosing a deployment that has not upgraded.
 
-**1. Query strings and form fields are never URL-decoded.** `HttpUtil.parseQueryStrings()` (`HttpUtil.java:32`) and `HttpUtil.parsePostFields()` (`HttpUtil.java:13`) split on `&` / `=` and `trim()` the value, but nothing in `src/` calls `URLDecoder.decode()`. `%20`, `%C3%A6` and `+` arrive at the handler verbatim. Clients must pre-encode, or endpoints must decode themselves.
+**1. Query strings and form fields are URL-decoded (fixed 3.5.0).** Before
+3.5.0 nothing in `src/` called `URLDecoder.decode()`, so `%20`, `%C3%A6` and `+`
+reached the handler verbatim and clients had to pre-encode. `HttpUtil.urlDecode()`
+now percent-decodes as UTF-8 and treats `+` as a space in **both** query strings
+and form bodies — the behaviour browsers, Spring and PHP have. Two consequences
+worth knowing:
 
-**2. `!RAW` and form fields are truncated for multi-line bodies.** In `parsePostFields()` (`HttpUtil.java:16-21`):
-- `!RAW` is assembled with `rawRequest.append(requestLines[index])` and **no separator**, so line breaks are dropped;
-- the loop stops at `requestLines.length - 1`, so the **last body line is always lost**;
-- form fields are parsed only from `requestLines[linesProcessed]` — **the first body line**. Everything after it never becomes a field.
+- A literal `+` in a query parameter is now a space. A base64 or signature value
+  passed in a query string must be percent-encoded (`%2B`) by the client.
+- A value that is not validly encoded (a bare `%`, or `%ZZ`) is returned
+  **unchanged** rather than rejected, so such clients keep getting exactly the
+  response they got before. `urlDecode` never throws.
 
-A pretty-printed (multi-line) form-encoded or JSON body therefore produces a mangled `!RAW` and almost no fields. Prefer `request.getRawPost()`, which is sliced off the raw `\r\n\r\n` separator (`RestHttpServer.java:934-947`) and preserves the body as sent.
+`!RAW` is deliberately **not** decoded — a JSON payload containing `%` or `+`
+survives intact. Form fields are.
 
-**3. The body is read without honouring `Content-Length`.** `handleRead()` (`RestHttpServer.java:722`) does one `channel.read()` plus a best-effort `while (channel.read(...) > 0)` drain. On a non-blocking socket that loop returns `0` as soon as the currently-arrived segment is consumed, so a body split across TCP segments is parsed **truncated**, with no error and no retry — there is no request-completeness check. `MAX_BYTES` (5 MB) also truncates silently.
+**2. `!RAW` and form fields survive multi-line bodies (fixed 3.5.0).** The old
+`parsePostFields()` joined body lines with no separator and stopped one line
+short, so `!RAW` was mangled and only the **first** body line became fields — a
+pretty-printed form or JSON body produced almost nothing. Body lines are now
+joined with `\n` (which reproduces `\r\n`, since each line keeps its `\r`), and
+every line contributes fields. `request.getRawPost()` — the `\r\n\r\n` slice in
+`parseRequest` — was always correct and remains the verbatim body.
 
-`Content-Length` is **never parsed anywhere in the codebase** — the header is only ever *set* on the response side. The read buffer is a single shared `ByteBuffer.allocate(2048)` (`RestHttpServer.java:100`), so anything past the first 2 KB of a request arrives only if the opportunistic drain happens to catch it. Any endpoint that accepts a large body — notably a JSON-RPC `tools/call` payload — is unreliable today. Fixing this is a prerequisite for the MCP transport work below.
+**3. The body is read by `Content-Length`, not by luck (fixed 3.5.0).** The old
+`handleRead()` parsed whatever the first `channel.read()` returned, so a body
+split across TCP segments was parsed **truncated**, silently, with no retry.
 
-**4. The request is decoded with the platform default charset.** `new String(bytes)` at `RestHttpServer.java:776` and `:790` — no `StandardCharsets.UTF_8`. Non-ASCII payloads (`æøå`) depend on the JVM default charset (UTF-8 on JDK 18+, platform-dependent before that).
+`RequestAccumulator` now buffers the bytes of one request per connection and
+answers "is the whole request here yet": headers terminated, and at least
+`Content-Length` body bytes buffered. `HttpUtil.parseContentLength()` is the
+parser. Requests with no usable `Content-Length`, and any request declaring
+`Transfer-Encoding`, complete at the end of their headers — so GET and other
+bodiless requests behave exactly as before. Two further consequences:
+
+- The 2 KB read buffer (`ByteBuffer.allocate(2048)`) no longer bounds the
+  request. Bodies up to `MAX_REQUEST_BYTES` (5 MB) are assembled across as many
+  reads as it takes.
+- Over that limit the server answers **413 Payload Too Large** and closes,
+  instead of the old silent truncation. `Response.PayloadTooLarge()` exists for
+  this.
+
+The accumulator lives on `InternalClientSession`; `handleWrite` replaces the
+session object before re-registering for `OP_READ`, so it belongs to exactly one
+request. **Pipelined requests are still not supported** — only the first request
+in a segment is parsed, as before.
+
+**4. The request is decoded as UTF-8 (fixed 3.5.0).** `new String(bytes)` on the
+platform default charset was replaced by `StandardCharsets.UTF_8`, so `æøå` no
+longer depends on the JVM's default charset.
 
 **5. Unmatched paths fall through to static serving (3.2.0+).** In 3.1.1 the endpoint miss branch ended in `else { return new Response().NotFound(); }` — a bare 404 with a **zero-length body**, and static files shadowed endpoints. Since 3.2.0 `handleRequestMapping` matches endpoints first, runs `RequestFilter`s for *every* request (endpoint `null` when nothing matched), then falls back to the document handler. `isRequestADocument()` checks `exists() && isFile()`, so a directory can no longer be served as a file. A "404 with an empty body" against an old build usually means this change has not been picked up.
 
@@ -151,7 +190,7 @@ Defects the modernization must fix in the same pass, all in `McpDispatcher`:
 - **Notifications get a response body.** Requests without `id` should get `202 Accepted` and no body.
 - **`resources/*` is unimplemented** — `resources/list` always returns an empty array and `@McpResource` is dead code.
 
-Two transport prerequisites, both covered in [Request-parsing pitfalls](#request-parsing-pitfalls-read-before-touching-resthttprequest--httputil): `Content-Length` is never parsed anywhere in the codebase, and the read buffer is `ByteBuffer.allocate(2048)` (`RestHttpServer.java:100`). A Streamable HTTP transport is one POST per message, routinely carrying large `tools/call` payloads — so the body path must be fixed before the transport can be reliable.
+The two transport prerequisites — `Content-Length` never being parsed, and the read buffer being `ByteBuffer.allocate(2048)` (`RestHttpServer.java:100`) — were **fixed in 3.5.0** (see [Request parsing](#request-parsing)). A Streamable HTTP transport is one POST per message, routinely carrying large `tools/call` payloads, so large bodies now assemble correctly and the remaining work is the protocol itself, not the transport plumbing.
 
 **SSE is not reachable without new plumbing.** Endpoints have no access to `SocketChannel` or `SelectionKey` — they only return a `Response`, and `Response.chunked()` buffers the entire body and writes it in one shot. The WebSocket stack is the only real streaming path in the codebase. A long-lived stream would additionally be killed by the 30s request timeout and the 60s idle sweep unless explicitly exempted via `@Timeout(ms = 0)` and the idle-connection sweep. Deferring SSE is compliant: the spec lets the server answer a request with a single `application/json` object instead of `text/event-stream`.
 
@@ -292,6 +331,42 @@ Loaded via `java.util.ServiceLoader` in `ModuleRegistry.loadPlugins(httpModule)`
 - Cross-plugin dependencies (e.g. auth needs database) require careful design
 
 ## Recent Changes
+
+### Request parsing, pool handles and release versioning (2026-09-27, v3.5.0)
+
+A pass over defects measured against the 3.4.0 jar. Two are behavioural changes
+that downstream clients can notice, which is why this is a **minor** release:
+
+- **Request parsing** — URL-decoding, multi-line bodies, `Content-Length`-driven
+  assembly, and UTF-8 decoding. See [Request parsing](#request-parsing) for the
+  full contract and the two client-visible consequences (`+` now means a space;
+  the 5 MB limit answers 413 instead of truncating).
+- **`PooledDataSource` hands out logical handles** —
+  `try (Connection c = ds.getConnection())` returned the physical connection, so
+  `close()` shut the socket while the reference stayed in `activeConnections`
+  forever. The pool filled with dead entries and every later lookup failed with
+  `Connection pool exhausted` after the full timeout, at a call site that had
+  done nothing wrong, and nothing reclaimed it: `evict()` only inspects
+  `idlePool`. `PooledConnectionHandler` (a `java.lang.reflect.Proxy`, no new
+  dependency) makes `close()` release to the pool and marks the handle
+  single-use, so a stale handle throws instead of quietly sharing a connection
+  another thread now owns. `releaseConnection()` accepts either form. The one
+  compatibility risk is code that casts the connection to a vendor class such as
+  `PGConnection`.
+- **`Server:` header version** — `release.sh` built the jar before writing the
+  new version, so every artifact announced the *previous* release (the 3.4.0 jar
+  said `CAS)/3.3`). The version steps now run before `build_jar`.
+- **`Response` charset** — the four independent `if`s that appended
+  `; charset=utf-8` are now one guarded block, so a caller-supplied
+  `ContentType("application/json; charset=utf-8")` no longer gains a second
+  charset. This was reported as "every JSON and HTML response gets a double
+  charset"; it was measured not to reproduce for any server-generated content
+  type, so this is a robustness fix rather than a fix for the reported symptom.
+
+New test classes: `RequestAccumulatorTest`, `ResponseHeaderTest`,
+`RestHttpServerSplitRequestBodyTest` (socket-level proof that a split request
+assembles), `ReleaseScriptTest`; `HttpUtilTest` and `PooledDataSourceTest` were
+extended.
 
 ### GraphQL security hardening (2026-08-21, v3.3.0)
 

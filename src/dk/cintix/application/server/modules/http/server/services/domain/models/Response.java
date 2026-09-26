@@ -125,6 +125,11 @@ public class Response {
         return this;
     }
 
+    public Response PayloadTooLarge() {
+        status = 413;
+        return this;
+    }
+
     public Response TooManyRequests() {
         status = Status.TooManyRequests.getValue();
         return this;
@@ -245,16 +250,15 @@ public class Response {
         }
         if (!header.containsKey("Content-Type") && content.length > 0) {
             response += "Content-Type: " + contentType;
-            if (contentType.toLowerCase().contains("/text")) {
-                response += "; charset=utf-8";
-            }
-            if (contentType.toLowerCase().contains("/json")) {
-                response += "; charset=utf-8";
-            }
-            if (contentType.toLowerCase().contains("plain")) {
-                response += "; charset=utf-8";
-            }
-            if (contentType.toLowerCase().contains("html")) {
+            // Append the charset at most once, and never when the caller already
+            // supplied one — otherwise "application/json; charset=utf-8" passed
+            // through ContentType(...) would gain a second charset.
+            String lowered = contentType.toLowerCase();
+            if (!lowered.contains("charset")
+                    && (lowered.contains("/text")
+                        || lowered.contains("/json")
+                        || lowered.contains("plain")
+                        || lowered.contains("html"))) {
                 response += "; charset=utf-8";
             }
             response += "\r\n";
@@ -323,6 +327,9 @@ public class Response {
         }
         if (code == 408) {
             return "Request Timeout";
+        }
+        if (code == 413) {
+            return "Payload Too Large";
         }
         if (code == 429) {
             return "Too Many Requests";

@@ -1,5 +1,7 @@
 package dk.cintix.application.server.modules.http.server.endpoint;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -10,23 +12,102 @@ import java.util.regex.Pattern;
  */
 public class HttpUtil {
 
+    /**
+     * Splits the body out of {@code requestLines} into {@code postFields}.
+     *
+     * <p>The body starts at {@code linesProcessed} and runs to the end of the
+     * array. {@code requestLines} comes from {@code String.split("\n")}, so
+     * every line except the last still carries its trailing {@code \r};
+     * joining with {@code \n} therefore reproduces the body byte for byte.</p>
+     *
+     * <p>{@code !RAW} is the untouched body and is deliberately <b>not</b>
+     * URL-decoded, so a JSON payload containing {@code %} or {@code +}
+     * survives intact. Form fields are decoded.</p>
+     */
     public static void parsePostFields(int linesProcessed, String[] requestLines, final Map<String, String> postFields) {
-        if (linesProcessed < (requestLines.length)) {
-            StringBuilder rawRequest = new StringBuilder();
-            for (int index = linesProcessed; index < requestLines.length - 1; index++) {
-                rawRequest.append(requestLines[index]);
-            }
+        if (linesProcessed >= requestLines.length) {
+            return;
+        }
 
-            postFields.put("!RAW", rawRequest.toString());
-            String[] postParams = requestLines[linesProcessed++].split("&");
-            for (int index = 0; index < postParams.length; index++) {
-                if (postParams[index].contains("=")) {
-                    String[] keyValue = postParams[index].split("=", 2);
-                    String value = (keyValue.length > 1 && keyValue[1] != null) ? keyValue[1].trim() : "";
-                    postFields.put(keyValue[0], value);
-                }
+        StringBuilder rawRequest = new StringBuilder();
+        for (int index = linesProcessed; index < requestLines.length; index++) {
+            if (index > linesProcessed) {
+                rawRequest.append('\n');
+            }
+            rawRequest.append(requestLines[index]);
+        }
+        String body = rawRequest.toString();
+
+        postFields.put("!RAW", body);
+
+        // A form body may span several lines, so every body line contributes
+        // fields — not just the first one.
+        String[] postParams = body.split("[&\\r\\n]+");
+        for (int index = 0; index < postParams.length; index++) {
+            if (postParams[index].contains("=")) {
+                String[] keyValue = postParams[index].split("=", 2);
+                String value = (keyValue.length > 1 && keyValue[1] != null) ? keyValue[1].trim() : "";
+                postFields.put(urlDecode(keyValue[0].trim()), urlDecode(value));
             }
         }
+    }
+
+    /**
+     * Percent-decodes a query-string or form value as UTF-8, treating
+     * {@code +} as a space.
+     *
+     * <p>A value that is not validly encoded (a bare {@code %}, or {@code %ZZ})
+     * is returned unchanged rather than rejected, so clients that send such
+     * values keep getting exactly the response they got before.</p>
+     */
+    public static String urlDecode(String value) {
+        if (value == null || value.isEmpty()) {
+            return value;
+        }
+        if (value.indexOf('%') == -1 && value.indexOf('+') == -1) {
+            return value;
+        }
+        try {
+            return URLDecoder.decode(value, "UTF-8");
+        } catch (UnsupportedEncodingException | IllegalArgumentException e) {
+            return value;
+        }
+    }
+
+    /**
+     * Reads {@code Content-Length} out of a raw header block.
+     *
+     * <p>Matched case-insensitively because the header name on the wire is
+     * case-insensitive; the value is not trimmed of anything but surrounding
+     * whitespace, so a non-numeric value is reported as absent rather than
+     * guessed at.</p>
+     *
+     * @param headerBlock the raw request headers, terminator included
+     * @return the declared body length, or {@code -1} when the header is
+     *         missing, unparseable, or negative
+     */
+    public static long parseContentLength(String headerBlock) {
+        if (headerBlock == null) {
+            return -1;
+        }
+        String[] lines = headerBlock.split("\n");
+        for (int index = 0; index < lines.length; index++) {
+            String line = lines[index].trim();
+            int colon = line.indexOf(':');
+            if (colon <= 0) {
+                continue;
+            }
+            if (!line.substring(0, colon).trim().equalsIgnoreCase("Content-Length")) {
+                continue;
+            }
+            try {
+                long length = Long.parseLong(line.substring(colon + 1).trim());
+                return length < 0 ? -1 : length;
+            } catch (NumberFormatException e) {
+                return -1;
+            }
+        }
+        return -1;
     }
 
     public static String parseQueryStrings(String contextPath, final Map<String, String> queryStrings) {
@@ -38,9 +119,11 @@ public class HttpUtil {
                 if (queryStrins[index].contains("=")) {
                     String[] keyValue = queryStrins[index].split("=", 2);
                     String value = (keyValue.length > 1 && keyValue[1] != null) ? keyValue[1].trim() : "";
-                    queryStrings.put(keyValue[0], value);
+                    queryStrings.put(urlDecode(keyValue[0].trim()), urlDecode(value));
                 } else {
-                    queryStrings.put(queryStrins[index], "");
+                    // Valueless keys are inserted with an empty value on purpose:
+                    // the "?jsd" documentation switch is a containsKey lookup.
+                    queryStrings.put(urlDecode(queryStrins[index].trim()), "");
                 }
             }
             return contextPath.substring(0, offset);
