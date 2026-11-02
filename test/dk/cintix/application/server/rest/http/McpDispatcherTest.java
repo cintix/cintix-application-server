@@ -27,6 +27,11 @@ public class McpDispatcherTest {
         autoDiscoveryFromEndpoints();
         missingToolNameReturnsError();
         invokeToolWithNoParams();
+        numericArgumentsBindToAllPrimitiveTypes();
+        mcpParamCustomNameBinds();
+        unknownToolErrorCarriesMessage();
+        toolFailureCarriesCauseMessage();
+        notificationReturnsNull();
     }
 
     // --- Happy paths ---
@@ -242,6 +247,102 @@ public class McpDispatcherTest {
         TestSupport.assertTrue(result.containsKey("isError"), "should have isError when tool name missing");
     }
 
+    // --- Error reporting, argument coercion, notifications ---
+
+    public void numericArgumentsBindToAllPrimitiveTypes() {
+        // Arrange — Gson decodes every JSON number as Double
+        McpRegistry registry = new McpRegistry();
+        registry.register(new NumericToolHandler());
+        McpDispatcher dispatcher = new McpDispatcher(registry);
+
+        // Act
+        Map<String, Object> response = dispatcher.handle(
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"measure\","
+            + "\"arguments\":{\"count\":3,\"total\":42,\"ratio\":1.5,\"enabled\":true}}}"
+        );
+
+        // Assert — every value reached the method with its declared type
+        TestSupport.assertFalse(response.containsKey("error"),
+                "Numeric binding failed: " + response);
+        TestSupport.assertTrue(firstContentText(response).contains("3/42/1.5/true"),
+                "Arguments were not coerced to the declared types: " + response);
+    }
+
+    public void mcpParamCustomNameBinds() {
+        // Arrange — the schema advertises "user_name", not the Java name
+        McpRegistry registry = new McpRegistry();
+        registry.register(new NumericToolHandler());
+        McpDispatcher dispatcher = new McpDispatcher(registry);
+
+        // Act
+        Map<String, Object> response = dispatcher.handle(
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"named\","
+            + "\"arguments\":{\"user_name\":\"Alice\"}}}"
+        );
+
+        // Assert
+        TestSupport.assertTrue(firstContentText(response).contains("Hello Alice"),
+                "@McpParam name was not used for binding: " + response);
+    }
+
+    public void unknownToolErrorCarriesMessage() {
+        // Arrange
+        McpRegistry registry = new McpRegistry();
+        McpDispatcher dispatcher = new McpDispatcher(registry);
+
+        // Act
+        Map<String, Object> response = dispatcher.handle(
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"nonexistent\"}}"
+        );
+
+        // Assert — the failure reason must reach the client
+        TestSupport.assertTrue(firstContentText(response).contains("Unknown tool: nonexistent"),
+                "Unknown-tool message was swallowed: " + response);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = (Map<String, Object>) response.get("result");
+        TestSupport.assertTrue(Boolean.TRUE.equals(result.get("isError")), "isError must be true");
+    }
+
+    public void toolFailureCarriesCauseMessage() {
+        // Arrange
+        McpRegistry registry = new McpRegistry();
+        registry.register(new NumericToolHandler());
+        McpDispatcher dispatcher = new McpDispatcher(registry);
+
+        // Act
+        Map<String, Object> response = dispatcher.handle(
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"fail\",\"arguments\":{}}}"
+        );
+
+        // Assert — the tool's own message, not a generic "Tool error"
+        TestSupport.assertTrue(firstContentText(response).contains("boom-detail"),
+                "Tool failure message was swallowed: " + response);
+    }
+
+    public void notificationReturnsNull() {
+        // Arrange — a valid request without an id is a notification
+        McpRegistry registry = new McpRegistry();
+        McpDispatcher dispatcher = new McpDispatcher(registry);
+
+        // Act
+        Map<String, Object> response = dispatcher.handle(
+            "{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\"}"
+        );
+
+        // Assert — no response body may be produced for a notification
+        TestSupport.assertNull(response, "A notification must not produce a response");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String firstContentText(Map<String, Object> response) {
+        Map<String, Object> result = (Map<String, Object>) response.get("result");
+        TestSupport.assertTrue(result != null, "Expected a result object: " + response);
+        List<Map<String, Object>> content = (List<Map<String, Object>>) result.get("content");
+        TestSupport.assertTrue(content != null && !content.isEmpty(),
+                "Expected error content to carry the message: " + response);
+        return (String) content.get(0).get("text");
+    }
+
     // --- Test classes ---
 
     public static class TestToolHandler {
@@ -265,6 +366,24 @@ public class McpDispatcherTest {
         @McpTool(name = "get_status", description = "Get system status")
         public Response status() {
             return new Response().OK().data("ok");
+        }
+    }
+
+    public static class NumericToolHandler {
+
+        @McpTool(name = "measure", description = "Echo every primitive type")
+        public String measure(int count, long total, double ratio, boolean enabled) {
+            return count + "/" + total + "/" + ratio + "/" + enabled;
+        }
+
+        @McpTool(name = "named", description = "Bind by the advertised name")
+        public String named(@McpParam(name = "user_name", description = "User") String value) {
+            return "Hello " + value;
+        }
+
+        @McpTool(name = "fail", description = "Always fails")
+        public String fail() {
+            throw new IllegalStateException("boom-detail");
         }
     }
 }

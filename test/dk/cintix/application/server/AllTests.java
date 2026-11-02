@@ -16,6 +16,7 @@ import dk.cintix.application.server.rest.http.McpDispatcherTest;
 import dk.cintix.application.server.rest.http.OpenApiServiceTest;
 import dk.cintix.application.server.rest.http.RequestAccumulatorTest;
 import dk.cintix.application.server.rest.http.ResponseHeaderTest;
+import dk.cintix.application.server.rest.http.RestHttpServerDocumentJailTest;
 import dk.cintix.application.server.rest.http.RestHttpServerPathTest;
 import dk.cintix.application.server.rest.http.RestHttpServerSplitRequestBodyTest;
 import dk.cintix.application.server.rest.http.RestHttpServerHealthCheckTest;
@@ -43,6 +44,7 @@ public class AllTests {
         new RestHttpServerHealthCheckTest().runAll();
         new RestHttpServerKeepAliveTest().runAll();
         new RestHttpServerRootPathTest().runAll();
+        new RestHttpServerDocumentJailTest().runAll();
         new RestHttpServerPathTest().runAll();
         new RestActionCacheKeyTest().runAll();
         new EntityManagerInjectionTest().runAll();

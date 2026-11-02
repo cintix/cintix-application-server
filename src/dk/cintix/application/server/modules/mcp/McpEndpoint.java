@@ -25,6 +25,10 @@ public class McpEndpoint {
     public Response handle(String body) {
         try {
             Map<String, Object> result = dispatcher.handle(body);
+            if (result == null) {
+                // JSON-RPC notification: accepted, but no response body.
+                return new Response().Accpeted();
+            }
             return new Response().OK().ContentType("application/json").data(gson.toJson(result));
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();

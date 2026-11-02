@@ -86,11 +86,13 @@ every line contributes fields. `request.getRawPost()` — the `\r\n\r\n` slice i
 split across TCP segments was parsed **truncated**, silently, with no retry.
 
 `RequestAccumulator` now buffers the bytes of one request per connection and
-answers "is the whole request here yet": headers terminated, and at least
-`Content-Length` body bytes buffered. `HttpUtil.parseContentLength()` is the
-parser. Requests with no usable `Content-Length`, and any request declaring
-`Transfer-Encoding`, complete at the end of their headers — so GET and other
-bodiless requests behave exactly as before. Two further consequences:
+answers "is the whole request here yet": headers terminated, and the body — by
+`Content-Length`, or by chunked transfer coding — fully buffered.
+`HttpUtil.parseContentLength()` and `HttpUtil.parseHeaderValue()` are the
+parsers. Requests with no usable `Content-Length` complete at the end of their
+headers — so GET and other bodiless requests behave exactly as before — and a
+non-chunked `Transfer-Encoding` does too (see item 5 below). Two further
+consequences:
 
 - The 2 KB read buffer (`ByteBuffer.allocate(2048)`) no longer bounds the
   request. Bodies up to `MAX_REQUEST_BYTES` (5 MB) are assembled across as many
@@ -109,6 +111,112 @@ platform default charset was replaced by `StandardCharsets.UTF_8`, so `æøå` n
 longer depends on the JVM's default charset.
 
 **5. Unmatched paths fall through to static serving (3.2.0+).** In 3.1.1 the endpoint miss branch ended in `else { return new Response().NotFound(); }` — a bare 404 with a **zero-length body**, and static files shadowed endpoints. Since 3.2.0 `handleRequestMapping` matches endpoints first, runs `RequestFilter`s for *every* request (endpoint `null` when nothing matched), then falls back to the document handler. `isRequestADocument()` checks `exists() && isFile()`, so a directory can no longer be served as a file. A "404 with an empty body" against an old build usually means this change has not been picked up.
+
+### Request parsing and pool diagnostics (fixed after 3.5.0)
+
+A pass over the parsing backlog and the pool's missing leak diagnostics. All
+seven items are now fixed; 5 and 6 (request-body framing) landed afterwards.
+
+**Fixed — multi-value parameters.** `HttpUtil.parseQueryStrings` and
+`parsePostFields` now take an optional `Map<String, List<String>>` alongside the
+existing `Map<String, String>`. The single-value map keeps its last-wins
+behaviour, so every existing caller is unaffected; the multi-value map keeps
+every value in the order sent. `RestHttpRequest.getQueryStringValues(name)` and
+`getPostValues(name)` return the decoded values as an unmodifiable list, empty
+when the key is absent. The old seven-argument `RestHttpRequest` constructor
+derives a single-value view, so third-party construction still works.
+
+**Fixed — `Content-Type`-aware field parsing.** `parsePostFields` mines form
+fields only for `application/x-www-form-urlencoded` (a `charset` parameter is
+ignored) or when no `Content-Type` is present — the legacy hand-written-client
+case. Every other type leaves the field map empty apart from `!RAW`, so a JSON
+body such as `{"a":"x=1"}` no longer yields a bogus field `a`.
+`RestHttpServer.parseRequest` passes the parsed `CONTENT-TYPE` header into the
+parser.
+
+**Fixed — malformed percent-encoding is logged.** `urlDecode` still returns the
+value unchanged when decoding fails, but now logs at FINE with the offending
+value, so `%ZZ` is visible when debugging without changing client-visible
+behaviour.
+
+**Fixed — the request size limit is configurable.**
+`RestHttpServer.setMaxRequestBytes(int)` / `getMaxRequestBytes()` replace the
+fixed 5 MB cap (minimum 1 KB). Over the limit the server still answers `413`
+rather than truncating.
+
+**Fixed — connection pool leak diagnostics.** `PooledDataSource` records the
+borrow time, borrowing thread and stack for every active connection. When the
+pool is exhausted, the `SQLException` lists the longest-held borrows and the
+stacks that took them, so the failure names the line that forgot to close.
+`setLeakDetectionThresholdMs(ms)` additionally makes the eviction sweep log one
+WARNING per connection held past the threshold; `0` (default) disables the
+warning but not the exhaustion report. `setEvictionIntervalMs` now reschedules
+the sweep instead of being silently ineffective after construction. Covered by
+`PooledDataSourceTest.poolExhaustion_reportsBorrowingThreadAndStack` and
+`leakDetection_warnsWithBorrowingStack`.
+
+**Fixed — 5. Chunked request bodies are parsed and de-chunked.**
+`RequestAccumulator` used to treat a request declaring `Transfer-Encoding` as
+complete at the end of its headers, so the body was never read and
+`getRawPost()` returned empty. It now walks the chunk framing incrementally: a
+chunk-size line in hex (chunk extensions after `;` ignored), that many payload
+bytes, the line break, repeated until the zero-length chunk, then the trailer
+section up to its blank line. The scan resumes from the last complete chunk, so
+each byte is examined a bounded number of times however the body is split.
+
+`toByteArray()` returns the request **with the body already de-chunked** —
+headers followed by the payload — so `parseRequest`, `getRawPost()`,
+`getPostValues()` and the endpoint all see exactly the same shape they see for a
+`Content-Length` request. Nothing downstream knows the body arrived as chunks.
+
+Invalid framing can never become valid, so `isMalformed()` reports an
+unreadable chunk size (or chunk data not followed by a line break) and
+`handleRead` answers **400 Bad Request** and closes the connection — the
+remainder on it is unframed and cannot be reused. A transfer coding that is not
+`chunked` (e.g. `gzip`) keeps the old behaviour and completes at the headers,
+because its length is not knowable and stalling would be worse.
+
+**Fixed — 6. `Expect: 100-continue` is answered.** curl sends the header for
+bodies over ~1 KB and waits up to a second before sending anyway, so every
+large POST used to pay a silent latency penalty. When the headers are complete,
+a body is still outstanding and the client asked for it, `handleRead` writes
+`HTTP/1.1 100 Continue` before returning to the selector. It is written at most
+once per request (`RequestAccumulator.shouldSendContinue()` /
+`markContinueSent()`), and never when the body already arrived or no body is
+pending.
+
+#### Parsing-layer direction (partly done)
+
+Items 1–3 shared one root cause: `HttpUtil` folds framing, syntax, decoding and
+content-type context into a single eagerly-decoded `Map<String, String>`. The
+multi-value and content-type fixes take the first step. The remaining direction
+is to parse once without decoding, and decode on access:
+
+- `raw(name)` — exactly as sent
+- `get(name)` — decoded, first value
+- `getAll(name)` — decoded, every value
+
+Decoding would then become per-context rather than universal: `+` means a space
+in a query string and in an `application/x-www-form-urlencoded` body, and is a
+literal plus everywhere else. **Never decode a path segment** — `+` and `%` are
+literal there. The code is correct on that last point today only because it
+never touches paths at all; adding path decoding later would introduce a bug.
+
+Lazy decoding would also make `!RAW` (`HttpUtil.java:41`) redundant. It exists
+purely because the field map is the only channel out of the parser, so the
+untouched body had to be stashed under a reserved key. It has no readers in
+`src/`.
+
+#### Deliberately not planned
+
+**HTTP/1.1 pipelining.** `handleRead` parses only the first request in the buffer
+and discards the remainder (`RestHttpServer.java:815`), so a pipelined second
+request is swallowed and the client hangs — degraded, not corrupted. Browsers
+removed pipelining years ago, and a correct implementation is a delicate state
+machine in exactly the code 3.5.0 just rewrote.
+
+**Streaming request bodies.** The same architectural gap as SSE: endpoints have
+no `SocketChannel`, and `Response.chunked()` buffers the whole body anyway.
 
 ### Annotation-driven routing
 
@@ -170,8 +278,16 @@ Registers `McpEndpoint` under `/api` → `POST /api/mcp`, a **JSON-RPC 2.0** end
 
 - **Methods**: `initialize`, `tools/list`, `tools/call`, `resources/list` (always returns an empty array). Anything else → `-32601`.
 - **Tool discovery has two paths**: the explicit varargs handlers, plus `registry.scanRegisteredEndpoints(getRegisteredEndpoints())`, which picks up `@McpTool` methods on objects already registered via `addEndpoint`.
-- **Argument binding** matches JSON keys to `Parameter.getName()` and converts with `ReflectionUtil.valueFromType()`, so argument names depend on the `-parameters` compiler flag (see below). Complex types fall back to the raw `Map`/`List` value.
-- **Known rough edge**: `McpDispatcher.errorInResult(code, message)` ignores both arguments and always returns `{"result":{"content":[],"isError":true}}` — the error code and message never reach the client, so tool-name and invocation failures are indistinguishable. `@McpResource` is declared but referenced nowhere.
+- **Argument binding** looks up the name advertised by `tools/list` —
+  `@McpParam(name = …)` when set, otherwise `Parameter.getName()` (which still
+  depends on the `-parameters` compiler flag). Values are coerced to the
+  declared primitive/wrapper type straight from the JSON value, with
+  `ReflectionUtil.valueFromType()` as the fallback for dates and other types.
+  Complex types fall back to the raw `Map`/`List` value.
+- **Failures are visible.** `errorInResult` returns a text content item with the
+  message and `_meta.errorCode`, so a missing tool name, an unknown tool and an
+  invocation failure are distinguishable. `@McpResource` is declared but
+  referenced nowhere.
 
 #### Protocol status and next-version backlog
 
@@ -182,12 +298,27 @@ The target is **dual-era Streamable HTTP** on the one `/api/mcp` endpoint, detec
 - **Legacy (≤ `2025-11-25`)** — `initialize` handshake, server-minted `Mcp-Session-Id` on the response, echoed on every later request, terminated with HTTP `DELETE`; `404` for an unknown/expired session, `400` for a missing one.
 - **Modern (`2026-07-28`)** — fully stateless: no sessions, no `initialize`. Each request carries its version and capabilities in `_meta` (`io.modelcontextprotocol/protocolVersion`, `…/clientCapabilities`, `…/clientInfo`); required headers `MCP-Protocol-Version`, `Mcp-Method`, and `Mcp-Name` (for `tools/call`/`resources/read`/`prompts/get`) must be validated against the body and rejected with `400` + `HeaderMismatch (-32020)` on mismatch; unknown versions get `UnsupportedProtocolVersionError (-32022)` carrying a `supported` list; `server/discover` is mandatory; every result carries `resultType`; and list results carry `ttlMs`/`cacheScope`. A modern-only server answers `405` to GET/DELETE at the MCP endpoint and ignores `Mcp-Session-Id`.
 
-Defects the modernization must fix in the same pass, all in `McpDispatcher`:
+Fixed in the current pass (all in `McpDispatcher` / `McpEndpoint`):
 
-- **`errorInResult` swallows every failure** (`:184-188`). A failed `tools/call` is reported as a **successful** JSON-RPC response with empty `content` — missing tool name, unknown tool, and invocation failure are indistinguishable.
-- **Numeric tool arguments do not bind.** Gson 2.8.6 deserializes JSON numbers to `Double`, so `String.valueOf` yields `"3.0"`, `Integer.parseInt` throws in `invokeTool` (`:149-160`), and the fallback passes the `Double` into `method.invoke` → `IllegalArgumentException: argument type mismatch`. Only `String` params are covered by tests.
-- **`@McpParam(name = …)` is a latent mismatch** — the custom name is used in `tools/list` (`McpRegistry.java:60-61`) but binding looks up the Java parameter name (`:141`), which depends on `-parameters`.
-- **Notifications get a response body.** Requests without `id` should get `202 Accepted` and no body.
+- **Tool failures now carry their reason.** `errorInResult` includes a text
+  content item with the message and `_meta.errorCode`; a missing name, an
+  unknown tool and an invocation failure are distinguishable. Invocation
+  failures unwrap `InvocationTargetException`, so the tool's own message is
+  reported instead of a generic `Tool error`.
+- **Numeric tool arguments bind.** `convertArgument` narrows from `Number` for
+  int/long/short/byte/double/float, accepts booleans (including numeric 0/1),
+  char and enums, and only then falls back to
+  `ReflectionUtil.valueFromType`. `"3.0"`-style strings are tolerated for
+  integral types.
+- **`@McpParam(name = …)` binds.** `invokeTool` looks up the same name that
+  `tools/list` advertises, falling back to the Java parameter name only when no
+  custom name is set.
+- **Notifications get no response body.** A valid request without `id` makes
+  `McpDispatcher.handle` return `null`; `McpEndpoint` answers `202 Accepted`
+  with an empty body.
+
+Still open:
+
 - **`resources/*` is unimplemented** — `resources/list` always returns an empty array and `@McpResource` is dead code.
 
 The two transport prerequisites — `Content-Length` never being parsed, and the read buffer being `ByteBuffer.allocate(2048)` (`RestHttpServer.java:100`) — were **fixed in 3.5.0** (see [Request parsing](#request-parsing)). A Streamable HTTP transport is one POST per message, routinely carrying large `tools/call` payloads, so large bodies now assemble correctly and the remaining work is the protocol itself, not the transport plumbing.
@@ -244,7 +375,9 @@ Pipeline: `endpoint/GraphQLEndpoint` → `services/domain/parser/Lexer` → `Par
 
 ### Static file serving
 
-Served from `DOCUMENT_ROOT` (default `"web"`, configurable via `setDocumentRoot()`). HTML files (`.htm`/`.html`) are processed through `cintix-html-engine` for server-page rendering with request parameters merged as template properties. A jail check prevents directory traversal.
+Served from `DOCUMENT_ROOT` (default `"web"`, configurable via `setDocumentRoot()`). HTML files (`.htm`/`.html`) are processed through `cintix-html-engine` for server-page rendering with request parameters merged as template properties.
+
+The jail check in `isRequestADocument()` compares **canonical** paths with a separator boundary. The old `getAbsolutePath().startsWith(root)` test neither normalised `..` nor resolved symlinks and also matched sibling directories sharing the root's name prefix, so `GET /../outside.txt`, `GET /../web-evil/secret.txt` and a symlink inside the root could all be served from outside `DOCUMENT_ROOT`. Any future change here must keep canonicalisation — `RestHttpServerDocumentJailTest` covers all three vectors.
 
 ### WebSocket
 
@@ -331,6 +464,64 @@ Loaded via `java.util.ServiceLoader` in `ModuleRegistry.loadPlugins(httpModule)`
 - Cross-plugin dependencies (e.g. auth needs database) require careful design
 
 ## Recent Changes
+
+### Chunked request bodies and `Expect: 100-continue` (2026-11-02, unreleased)
+
+The last two open items from the request-parsing backlog — both in
+`RequestAccumulator`, so one coherent pass over request framing:
+
+- **Chunked request bodies** — a request declaring `Transfer-Encoding: chunked`
+  used to complete at the end of its headers, so the body was never read and
+  `getRawPost()` returned empty with no error. The accumulator now parses the
+  chunk framing incrementally and `toByteArray()` returns the body already
+  de-chunked, so every downstream consumer sees a normal request. Invalid
+  framing is answered with **400** and the connection closed. A non-chunked
+  transfer coding keeps the old complete-at-headers behaviour.
+- **`Expect: 100-continue`** — the interim response is now written as soon as
+  the headers are complete and a body is outstanding, removing the up-to-one-
+  second wait curl imposed on every large POST.
+
+New tests: `RequestAccumulatorTest` (chunk framing, decoding, extensions,
+trailers, malformed sizes, continue-negotiation) and
+`RestHttpServerSplitRequestBodyTest` (chunked round trip, chunked across
+segments, 400 on bad framing, interim response observed before the body is
+sent).
+
+### Static-file jail hardening and MCP dispatcher correctness (2026-11-02, unreleased)
+
+- **Static-file jail escape** — `isRequestADocument()` used
+  `getAbsolutePath().startsWith(root)`, which does not normalise `..`, does not
+  resolve symlinks, and treats a sibling directory such as `web-evil` as inside
+  `web`. `GET /../outside.txt`, `GET /../web-evil/secret.txt` and a symlink
+  planted in the root were all served from outside `DOCUMENT_ROOT`. The check
+  now canonicalises both paths and requires a separator boundary. New test:
+  `RestHttpServerDocumentJailTest`.
+- **MCP dispatcher** — tool failures now carry their message (plus
+  `_meta.errorCode`) instead of empty `content`; numeric arguments bind to
+  primitive/wrapper parameters instead of failing with an argument-type
+  mismatch; `@McpParam(name = …)` is honoured during binding; notifications
+  (no `id`) produce `202 Accepted` with no body. See the
+  [MCP section](#mcp-enablemcp).
+
+### Deeper request parsing and pool leak diagnostics (2026-11-02, unreleased)
+
+Two areas from the 3.5.0 backlog, chosen for production value:
+
+- **Pool leak diagnostics** — `PooledDataSource` now records the borrow time,
+  thread and stack for every active connection. An exhausted pool names the
+  longest-held borrows and the lines that took them; the optional
+  `setLeakDetectionThresholdMs()` makes the eviction sweep warn once per
+  over-held connection. `setEvictionIntervalMs()` now actually reschedules the
+  sweep. See [Request parsing and pool diagnostics](#request-parsing-and-pool-diagnostics-fixed-after-350).
+- **Deeper request parsing** — multi-value query/form accessors
+  (`getQueryStringValues`, `getPostValues`), `Content-Type`-aware form-field
+  parsing (a JSON body is no longer mined for fields), FINE logging for
+  malformed percent-encoding, and `setMaxRequestBytes()` replacing the fixed
+  5 MB limit.
+
+New tests: `HttpUtilTest` (multi-value, content-type gating),
+`RestHttpServerSplitRequestBodyTest` (multi-value round trip, JSON not mined,
+configurable 413) and `PooledDataSourceTest` (exhaustion report, leak warning).
 
 ### Request parsing, pool handles and release versioning (2026-09-27, v3.5.0)
 

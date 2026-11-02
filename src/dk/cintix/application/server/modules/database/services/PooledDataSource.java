@@ -6,9 +6,12 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -49,10 +52,21 @@ public class PooledDataSource implements javax.sql.DataSource {
     /** Interval (ms) between idle/lifetime eviction sweeps. */
     private volatile long evictionIntervalMs;
 
+    /**
+     * Time (ms) a connection may be borrowed before a leak warning names the
+     * borrowing thread and its stack. {@code 0} disables the warning (the
+     * default); a borrowed connection is still reported when the pool is
+     * exhausted.
+     */
+    private volatile long leakDetectionThresholdMs;
+
     // --- Per-instance state ---
     private final List<Connection> idlePool = new ArrayList<>();
     private final List<Connection> activeConnections = new ArrayList<>();
+    /** Borrow diagnostics, keyed by identity. Guarded by {@code this}. */
+    private final Map<Connection, BorrowRecord> borrowRecords = new IdentityHashMap<>();
     private final ScheduledExecutorService evictionExecutor;
+    private volatile ScheduledFuture<?> evictionTask;
     private volatile boolean closed;
 
     // --- Production defaults ---
@@ -63,6 +77,11 @@ public class PooledDataSource implements javax.sql.DataSource {
     private static final long DEFAULT_MAX_LIFETIME_MS = TimeUnit.MINUTES.toMillis(30);
     private static final int DEFAULT_VALIDATION_TIMEOUT_SEC = 3;
     private static final long DEFAULT_EVICTION_INTERVAL_MS = TimeUnit.MINUTES.toMillis(1);
+    private static final long DEFAULT_LEAK_DETECTION_THRESHOLD_MS = 0;
+
+    /** How many borrowed connections an exhaustion report names, oldest first. */
+    private static final int MAX_REPORTED_BORROWS = 3;
+    private static final int MAX_STACK_FRAMES = 8;
 
     /**
      * Creates a pool with production defaults for all sizing parameters.
@@ -86,6 +105,7 @@ public class PooledDataSource implements javax.sql.DataSource {
         this.maxLifetimeMs = DEFAULT_MAX_LIFETIME_MS;
         this.validationTimeoutSec = DEFAULT_VALIDATION_TIMEOUT_SEC;
         this.evictionIntervalMs = DEFAULT_EVICTION_INTERVAL_MS;
+        this.leakDetectionThresholdMs = DEFAULT_LEAK_DETECTION_THRESHOLD_MS;
 
         // Ensure max >= initial
         if (this.maxPoolSize < this.initialPoolSize) {
@@ -116,15 +136,16 @@ public class PooledDataSource implements javax.sql.DataSource {
             t.setDaemon(true);
             return t;
         });
-        evictionExecutor.scheduleWithFixedDelay(
+        evictionTask = evictionExecutor.scheduleWithFixedDelay(
             this::evict,
             evictionIntervalMs,
             evictionIntervalMs,
             TimeUnit.MILLISECONDS
         );
 
-        logger.log(Level.INFO, "Connection pool created: url={0}, initial={1}, max={2}, timeout={3}ms, idleTtl={4}ms, maxLife={5}ms",
-            new Object[]{url, initialPoolSize, maxPoolSize, connectionTimeoutMs, maxIdleTimeMs, maxLifetimeMs});
+        logger.log(Level.INFO, "Connection pool created: url={0}, initial={1}, max={2}, timeout={3}ms, idleTtl={4}ms, maxLife={5}ms, leakDetection={6}ms",
+            new Object[]{url, initialPoolSize, maxPoolSize, connectionTimeoutMs, maxIdleTimeMs, maxLifetimeMs,
+                leakDetectionThresholdMs == 0 ? "disabled" : String.valueOf(leakDetectionThresholdMs)});
     }
 
     // --- Configuration setters (call before first getConnection) ---
@@ -150,8 +171,35 @@ public class PooledDataSource implements javax.sql.DataSource {
     }
 
     public void setEvictionIntervalMs(long evictionIntervalMs) {
-        this.evictionIntervalMs = Math.max(1000, evictionIntervalMs);
+        long interval = Math.max(1000, evictionIntervalMs);
+        synchronized (this) {
+            this.evictionIntervalMs = interval;
+            if (!closed && evictionTask != null) {
+                // The sweep was scheduled with the old interval at construction.
+                // Reschedule so the setter is not silently ineffective.
+                evictionTask.cancel(false);
+                evictionTask = evictionExecutor.scheduleWithFixedDelay(
+                        this::evict, interval, interval, TimeUnit.MILLISECONDS);
+            }
+        }
     }
+
+    /**
+     * Enables leak detection: a connection borrowed for longer than
+     * {@code thresholdMs} causes one WARNING that names the borrowing thread
+     * and its stack, so the line that forgot to close it can be found.
+     *
+     * <p>{@code 0} disables the warning (default). The pool's existing
+     * eviction thread performs the check, so the warning appears at most one
+     * eviction interval after the threshold is crossed. Separately, when the
+     * pool is exhausted the {@link SQLException} always names the
+     * longest-held borrows and the stacks that borrowed them.</p>
+     */
+    public void setLeakDetectionThresholdMs(long thresholdMs) {
+        this.leakDetectionThresholdMs = Math.max(0, thresholdMs);
+    }
+
+    public long getLeakDetectionThresholdMs() { return leakDetectionThresholdMs; }
 
     // --- Getters ---
 
@@ -203,6 +251,7 @@ public class PooledDataSource implements javax.sql.DataSource {
             if (!removed) {
                 return false;
             }
+            borrowRecords.remove(physical);
             idlePool.add(physical);
             this.notifyAll();
             return true;
@@ -225,6 +274,7 @@ public class PooledDataSource implements javax.sql.DataSource {
                     Connection conn = idlePool.remove(idlePool.size() - 1);
                     if (isConnectionValid(conn)) {
                         activeConnections.add(conn);
+                        recordBorrow(conn);
                         return PooledConnectionHandler.wrap(this, conn);
                     }
                     // Stale connection — discard and try the next one
@@ -237,6 +287,7 @@ public class PooledDataSource implements javax.sql.DataSource {
                     try {
                         Connection conn = DriverManager.getConnection(url, user, password);
                         activeConnections.add(conn);
+                        recordBorrow(conn);
                         logger.log(Level.FINE, "Pool grown to {0} connections", currentTotal + 1);
                         return PooledConnectionHandler.wrap(this, conn);
                     } catch (SQLException e) {
@@ -248,10 +299,15 @@ public class PooledDataSource implements javax.sql.DataSource {
                 // Cannot grow — wait for a connection to be returned
                 long remaining = deadline - System.currentTimeMillis();
                 if (remaining <= 0) {
-                    throw new SQLException(
-                        "Connection pool exhausted: active=" + activeConnections.size() +
-                        ", idle=" + idlePool.size() + ", max=" + maxPoolSize +
-                        " (waited " + connectionTimeoutMs + "ms)");
+                    StringBuilder message = new StringBuilder();
+                    message.append("Connection pool exhausted: active=").append(activeConnections.size())
+                            .append(", idle=").append(idlePool.size()).append(", max=").append(maxPoolSize)
+                            .append(" (waited ").append(connectionTimeoutMs).append("ms)");
+                    if (!borrowRecords.isEmpty()) {
+                        message.append(". Connections currently borrowed (oldest first):\n")
+                                .append(buildBorrowReport(System.currentTimeMillis()));
+                    }
+                    throw new SQLException(message.toString());
                 }
 
                 try {
@@ -261,6 +317,116 @@ public class PooledDataSource implements javax.sql.DataSource {
                     throw new SQLException("Interrupted while waiting for a connection");
                 }
             }
+        }
+    }
+
+    /**
+     * Records who borrowed a connection and when. Must be called with
+     * {@code this} held.
+     *
+     * <p>The stack is captured on every borrow, not only when leak detection is
+     * enabled, because the pool-exhaustion report is the one place the
+     * responsible line matters most — and that failure can happen with the
+     * threshold at its default. The cost is a few microseconds against the
+     * driver round-trip a borrow already performs.</p>
+     */
+    private void recordBorrow(Connection conn) {
+        borrowRecords.put(conn, new BorrowRecord(
+                System.currentTimeMillis(),
+                Thread.currentThread().getName(),
+                Thread.currentThread().getStackTrace()));
+    }
+
+    /**
+     * Logs one WARNING per borrowed connection that has been held past the
+     * configured leak threshold. Runs from the eviction thread.
+     */
+    private void checkLeaks() {
+        long threshold = leakDetectionThresholdMs;
+        if (threshold <= 0) {
+            return;
+        }
+
+        List<String> warnings = new ArrayList<>();
+        long now = System.currentTimeMillis();
+        synchronized (this) {
+            for (BorrowRecord record : borrowRecords.values()) {
+                if (!record.warned && now - record.borrowedAt >= threshold) {
+                    record.warned = true;
+                    warnings.add(describeBorrow(record, now));
+                }
+            }
+        }
+
+        for (String warning : warnings) {
+            logger.log(Level.WARNING,
+                    "Possible connection leak: a connection was borrowed more than {0}ms ago and never closed.\n{1}"
+                    + "Wrap the connection in try-with-resources, or call close() when done.",
+                    new Object[]{threshold, warning});
+        }
+    }
+
+    /**
+     * Describes every currently borrowed connection, oldest first, with the
+     * borrowing thread and (when captured) the stack that borrowed it. Must be
+     * called with {@code this} held.
+     */
+    private String buildBorrowReport(long now) {
+        List<BorrowRecord> records = new ArrayList<>(borrowRecords.values());
+        records.sort((left, right) -> Long.compare(left.borrowedAt, right.borrowedAt));
+
+        StringBuilder report = new StringBuilder();
+        int shown = 0;
+        for (BorrowRecord record : records) {
+            if (shown == MAX_REPORTED_BORROWS) {
+                report.append("  ... and ").append(records.size() - shown).append(" more borrowed connection(s)\n");
+                break;
+            }
+            report.append(describeBorrow(record, now));
+            shown++;
+        }
+        return report.toString();
+    }
+
+    private String describeBorrow(BorrowRecord record, long now) {
+        StringBuilder description = new StringBuilder(256);
+        description.append("  connection borrowed ").append(now - record.borrowedAt)
+                .append("ms ago by thread \"").append(record.threadName).append('"');
+
+        if (record.stack == null) {
+            description.append(" (stack not captured; enable leakDetectionThresholdMs before borrowing)\n");
+            return description.toString();
+        }
+
+        description.append(":\n");
+        int shown = 0;
+        for (StackTraceElement frame : record.stack) {
+            String className = frame.getClassName();
+            if (className.startsWith("java.lang.Thread")
+                    || className.equals(PooledDataSource.class.getName())
+                    || className.startsWith(PooledDataSource.class.getName() + "$")) {
+                continue;
+            }
+            description.append("      at ").append(frame).append('\n');
+            if (++shown >= MAX_STACK_FRAMES) {
+                description.append("      ...\n");
+                break;
+            }
+        }
+        return description.toString();
+    }
+
+    /** Borrow diagnostic for one connection. Written under {@code this}. */
+    private static final class BorrowRecord {
+        final long borrowedAt;
+        final String threadName;
+        final StackTraceElement[] stack;
+        boolean warned;
+
+        BorrowRecord(long borrowedAt, String threadName, StackTraceElement[] stack) {
+            this.borrowedAt = borrowedAt;
+            this.threadName = threadName;
+            this.stack = stack;
         }
     }
 
@@ -286,6 +452,7 @@ public class PooledDataSource implements javax.sql.DataSource {
      */
     private void evict() {
         try {
+            checkLeaks();
             List<Connection> toClose = new ArrayList<>();
             synchronized (this) {
                 int idleCount = idlePool.size();
@@ -369,6 +536,7 @@ public class PooledDataSource implements javax.sql.DataSource {
             }
             idlePool.clear();
             activeConnections.clear();
+            borrowRecords.clear();
             this.notifyAll();
         }
         logger.log(Level.INFO, "Connection pool shut down: {0}", url);

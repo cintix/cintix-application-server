@@ -21,7 +21,15 @@ public class RequestAccumulatorTest {
         bodyLongerThanDeclared_isComplete();
         headersSplitAcrossReads_isIncompleteUntilTerminated();
         bareLineFeedTerminator_isAccepted();
-        transferEncoding_isCompleteAtHeaders();
+        chunkedBody_isIncompleteUntilTerminatingChunk();
+        chunkedBody_splitInsideChunk_staysIncomplete();
+        chunkedBody_toByteArray_returnsDecodedBody();
+        chunkedBody_withExtensionsAndTrailers_isComplete();
+        chunkedBody_invalidChunkSize_isMalformed();
+        nonChunkedTransferEncoding_completesAtHeaders();
+        expectContinue_requestedOnlyWhileBodyOutstanding();
+        expectContinue_notRequestedWhenBodyAlreadyArrived();
+        expectContinue_silentOnceMarkedSent();
         parserContentLengthGuard_matchesAccumulator();
         indexOfHeaderEnd_findsBothTerminators();
     }
@@ -116,14 +124,138 @@ public class RequestAccumulatorTest {
         TestSupport.assertTrue(accumulator.isComplete(), "LF LF terminator must be recognised");
     }
 
-    public void transferEncoding_isCompleteAtHeaders() {
+    public void chunkedBody_isIncompleteUntilTerminatingChunk() {
         // Arrange — a chunked body has no knowable length up front
         RequestAccumulator accumulator = new RequestAccumulator();
         append(accumulator, "POST /submit HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n");
 
-        // Act — must not wait forever for a Content-Length that never comes
+        // Act — the old accumulator called this complete at the headers and
+        // then handed an empty body to the endpoint.
+        boolean headersOnly = accumulator.isComplete();
+        append(accumulator, "5\r\nhello\r\n");
+        boolean afterFirstChunk = accumulator.isComplete();
+        append(accumulator, "0\r\n\r\n");
+        boolean afterTerminator = accumulator.isComplete();
+
+        // Assert
+        TestSupport.assertFalse(headersOnly, "Chunked request must not complete at the headers");
+        TestSupport.assertFalse(afterFirstChunk, "A chunked body without its terminating chunk is incomplete");
+        TestSupport.assertTrue(afterTerminator, "Zero-length chunk plus its blank line completes the request");
+    }
+
+    public void chunkedBody_splitInsideChunk_staysIncomplete() {
+        // Arrange — segments split mid-payload and mid-terminator
+        RequestAccumulator accumulator = new RequestAccumulator();
+        append(accumulator, "POST /submit HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n"
+                + "a\r\n01234");
+
+        // Act / Assert — half the chunk data, no line break yet
+        TestSupport.assertFalse(accumulator.isComplete(), "Incomplete chunk data must not count as complete");
+
+        append(accumulator, "56789\r\n0\r\n");
+        TestSupport.assertFalse(accumulator.isComplete(),
+                "The blank line ending the trailer section is still missing");
+
+        append(accumulator, "\r\n");
+        TestSupport.assertTrue(accumulator.isComplete(), "Request completes when the trailer ends");
+    }
+
+    public void chunkedBody_toByteArray_returnsDecodedBody() {
+        // Arrange — the server must see the same shape as a Content-Length body
+        RequestAccumulator accumulator = new RequestAccumulator();
+        String headers = "POST /submit HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n";
+        append(accumulator, headers
+                + "5\r\nhello\r\n"
+                + "6\r\n world\r\n"
+                + "0\r\n\r\n");
+
+        // Act
+        boolean complete = accumulator.isComplete();
+        String request = new String(accumulator.toByteArray(), StandardCharsets.UTF_8);
+
+        // Assert — chunk framing gone, payload intact
+        TestSupport.assertTrue(complete, "Chunked request should be complete");
+        TestSupport.assertEquals(headers + "hello world", request,
+                "toByteArray must return headers followed by the decoded body");
+    }
+
+    public void chunkedBody_withExtensionsAndTrailers_isComplete() {
+        // Arrange — chunk extensions and a trailer are legal and must be parsed
+        RequestAccumulator accumulator = new RequestAccumulator();
+        String headers = "POST /submit HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n";
+        append(accumulator, headers
+                + "3;name=value\r\nabc\r\n"
+                + "0\r\nX-Trailer: 1\r\n\r\n");
+
+        // Act
+        boolean complete = accumulator.isComplete();
+        String request = new String(accumulator.toByteArray(), StandardCharsets.UTF_8);
+
+        // Assert — the extension and the trailer are framing, not payload
+        TestSupport.assertTrue(complete, "Extensions and trailers must not stall the scan");
+        TestSupport.assertEquals(headers + "abc", request, "Framing leaked into the decoded body");
+    }
+
+    public void chunkedBody_invalidChunkSize_isMalformed() {
+        // Arrange — "zz" is not hexadecimal
+        RequestAccumulator accumulator = new RequestAccumulator();
+        append(accumulator, "POST /submit HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\nabc\r\n");
+
+        // Act / Assert — reported so the server can answer 400 instead of hanging
+        TestSupport.assertTrue(accumulator.isMalformed(),
+                "An unreadable chunk size must be reported as malformed");
+    }
+
+    public void nonChunkedTransferEncoding_completesAtHeaders() {
+        // Arrange — a coding we cannot frame (gzip) has no knowable length
+        RequestAccumulator accumulator = new RequestAccumulator();
+        append(accumulator, "POST /submit HTTP/1.1\r\nTransfer-Encoding: gzip\r\n\r\n");
+
+        // Act / Assert — keeps the old behaviour rather than stalling forever
         TestSupport.assertTrue(accumulator.isComplete(),
-                "Transfer-Encoding request must not stall waiting for Content-Length");
+                "A non-chunked transfer coding must not stall waiting for Content-Length");
+        TestSupport.assertFalse(accumulator.isChunked(), "gzip is not chunked framing");
+    }
+
+    public void expectContinue_requestedOnlyWhileBodyOutstanding() {
+        // Arrange — the client is holding a 10-byte body back
+        RequestAccumulator accumulator = new RequestAccumulator();
+        append(accumulator, "POST /submit HTTP/1.1\r\nExpect: 100-continue\r\nContent-Length: 10\r\n\r\n");
+
+        // Act
+        boolean beforeBody = accumulator.shouldSendContinue();
+
+        append(accumulator, "name=alice");
+
+        // Assert
+        TestSupport.assertTrue(beforeBody, "The interim response is owed while the body is outstanding");
+        TestSupport.assertFalse(accumulator.shouldSendContinue(),
+                "No interim response once the whole request has arrived");
+    }
+
+    public void expectContinue_notRequestedWhenBodyAlreadyArrived() {
+        // Arrange — a client that sent the body eagerly, in the same segment
+        RequestAccumulator accumulator = new RequestAccumulator();
+        append(accumulator, "POST /submit HTTP/1.1\r\nExpect: 100-continue\r\nContent-Length: 3\r\n\r\nabc");
+
+        // Act / Assert — there is nothing to continue into
+        TestSupport.assertFalse(accumulator.shouldSendContinue(),
+                "A complete request must not be answered with 100 Continue");
+    }
+
+    public void expectContinue_silentOnceMarkedSent() {
+        // Arrange — the interim response is written at most once per request
+        RequestAccumulator accumulator = new RequestAccumulator();
+        append(accumulator, "POST /submit HTTP/1.1\r\nExpect: 100-continue\r\nContent-Length: 11\r\n\r\n");
+
+        // Act
+        boolean first = accumulator.shouldSendContinue();
+        accumulator.markContinueSent();
+        boolean second = accumulator.shouldSendContinue();
+
+        // Assert
+        TestSupport.assertTrue(first, "Interim response expected before the body arrives");
+        TestSupport.assertFalse(second, "The interim response must not be sent twice");
     }
 
     public void parserContentLengthGuard_matchesAccumulator() {

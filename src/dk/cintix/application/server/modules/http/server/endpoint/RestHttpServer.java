@@ -103,9 +103,16 @@ public abstract class RestHttpServer implements HttpModule {
     /**
      * Largest request this server will buffer before answering 413. Applied to
      * the accumulated request, not to a single read, so a body larger than the
-     * 2 KB read buffer is fine up to this limit.
+     * 2 KB read buffer is fine up to this limit. Default: 5 MB; change it with
+     * {@link #setMaxRequestBytes(int)}.
      */
-    private static final int MAX_REQUEST_BYTES = 1024 * 1024 * 5; // 5MB
+    private static final int DEFAULT_MAX_REQUEST_BYTES = 1024 * 1024 * 5; // 5MB
+    private volatile int maxRequestBytes = DEFAULT_MAX_REQUEST_BYTES;
+
+    /** Interim response for {@code Expect: 100-continue} (RFC 7231 §5.1.1). */
+    private static final byte[] CONTINUE_INTERIM =
+            "HTTP/1.1 100 Continue\r\n\r\n".getBytes(StandardCharsets.US_ASCII);
+
     private String documentRoot = "web";
     private ExecutorService workerPool;
     private final ConcurrentLinkedQueue<SelectionKey> completionQueue = new ConcurrentLinkedQueue<>();
@@ -170,6 +177,17 @@ public abstract class RestHttpServer implements HttpModule {
     }
 
     public int getIdleReadTimeoutMs() { return idleReadTimeoutMs; }
+
+    /**
+     * Sets the largest request body this server will buffer before answering
+     * {@code 413 Payload Too Large}. The limit applies to the whole assembled
+     * request, not to one socket read. Default: 5 MB.
+     */
+    public void setMaxRequestBytes(int bytes) {
+        this.maxRequestBytes = Math.max(1024, bytes);
+    }
+
+    public int getMaxRequestBytes() { return maxRequestBytes; }
 
     /**
      * Returns a snapshot of all registered REST endpoints.
@@ -727,6 +745,37 @@ public abstract class RestHttpServer implements HttpModule {
         return false;
     }
 
+    /**
+     * Writes the {@code 100 Continue} interim response so a client stops
+     * waiting before uploading the body.
+     *
+     * <p>25 bytes on a freshly accepted socket fit in the send buffer, so a
+     * zero-byte write means the buffer was unexpectedly full: nothing reached
+     * the wire, the flag stays unset and a later read event retries. A partial
+     * write would leave half an interim response on the wire and the connection
+     * unusable, so it is reported as a failure and the caller disconnects.</p>
+     *
+     * @return {@code false} when the connection can no longer be trusted
+     */
+    private boolean writeInterimContinue(SocketChannel client, RequestAccumulator accumulated) {
+        ByteBuffer interim = ByteBuffer.wrap(CONTINUE_INTERIM);
+        try {
+            int written = client.write(interim);
+            if (written == 0) {
+                return true;
+            }
+            if (interim.hasRemaining()) {
+                logger.warning("Partial write of the 100 Continue interim response");
+                return false;
+            }
+            accumulated.markContinueSent();
+            return true;
+        } catch (IOException e) {
+            logger.log(Level.FINER, "Could not send 100 Continue: {0}", e.getMessage());
+            return false;
+        }
+    }
+
     private void handleRead(SelectionKey key) throws Exception {
         InternalClientSession clientSession = readAttachment(key);
         SocketChannel client = (SocketChannel) key.channel();
@@ -770,10 +819,10 @@ public abstract class RestHttpServer implements HttpModule {
                 dataBuffer.clear();
                 accumulated.append(chunk);
 
-                if (accumulated.size() > MAX_REQUEST_BYTES) {
+                if (accumulated.size() > maxRequestBytes) {
                     // Refuse rather than hand an endpoint a truncated body.
                     Response tooLarge = new Response().PayloadTooLarge()
-                            .data("Request exceeds " + MAX_REQUEST_BYTES + " bytes");
+                            .data("Request exceeds " + maxRequestBytes + " bytes");
                     InternalClientSession tooLargeSession = new InternalClientSession(
                             clientSession.getSessionId(), tooLarge);
                     key.interestOps(SelectionKey.OP_WRITE);
@@ -802,11 +851,30 @@ public abstract class RestHttpServer implements HttpModule {
             return;
         }
 
+        // Invalid chunk framing can never become a valid request, so refuse it
+        // immediately instead of waiting for a delimiter that will not come.
+        if (accumulated.isMalformed()) {
+            Response badRequest = new Response().BadRequest().data("Malformed request body framing");
+            InternalClientSession errorSession = new InternalClientSession(
+                    clientSession.getSessionId(), badRequest);
+            // The remaining bytes on the connection are unframed; do not reuse it.
+            errorSession.add("request-connection", "close");
+            key.interestOps(SelectionKey.OP_WRITE);
+            key.attach(errorSession);
+            return;
+        }
+
         // Refresh the idle timer for every segment — a slow upload that is
         // still making progress must not be swept away as idle.
         clientSession.add("last-read-time", System.currentTimeMillis());
 
         if (!accumulated.isComplete()) {
+            // A client that sent "Expect: 100-continue" is holding the body
+            // back until it hears from us — curl waits up to a second.
+            if (accumulated.shouldSendContinue() && !writeInterimContinue(client, accumulated)) {
+                handleDisconnect(key);
+                return;
+            }
             // Partial request; stay registered for OP_READ and wait for more.
             return;
         }
@@ -931,7 +999,9 @@ public abstract class RestHttpServer implements HttpModule {
     private RestHttpRequest parseRequest(RestClient restClient, SocketChannel client, String headerData) throws Exception {
         final Map<String, String> headers = new LinkedHashMap<>();
         final Map<String, String> queryStrings = new LinkedHashMap<>();
+        final Map<String, List<String>> queryStringValues = new LinkedHashMap<>();
         final Map<String, String> postFields = new LinkedHashMap<>();
+        final Map<String, List<String>> postValues = new LinkedHashMap<>();
         final InputStream inputStream = client.socket().getInputStream();
 
         String contextPath = "";
@@ -960,7 +1030,7 @@ public abstract class RestHttpServer implements HttpModule {
         contextPath = contextPath.trim();
 
         if (!documentationEndpoint.containsKey(contextPath)) {
-            contextPath = HttpUtil.parseQueryStrings(contextPath, queryStrings);
+            contextPath = HttpUtil.parseQueryStrings(contextPath, queryStrings, queryStringValues);
             contextPath = contextPath.trim();
         }
 
@@ -969,8 +1039,9 @@ public abstract class RestHttpServer implements HttpModule {
         }
 
         linesProcessed = HttpUtil.parseHeaderKeys(requestLines, headers, linesProcessed);
-        HttpUtil.parsePostFields(linesProcessed, requestLines, postFields);
-        RestHttpRequest httpRequest = new RestHttpRequest(headers, queryStrings, postFields, inputStream, method, contextPath, rawPost);
+        HttpUtil.parsePostFields(linesProcessed, requestLines, headers.get("CONTENT-TYPE"), postFields, postValues);
+        RestHttpRequest httpRequest = new RestHttpRequest(headers, queryStrings, postFields,
+                queryStringValues, postValues, inputStream, method, contextPath, rawPost);
         requestEvent(restClient, httpRequest);
         String subdomain = headers.get("HOST");
         if (subdomain != null && subdomain.contains(".")) {
@@ -982,14 +1053,24 @@ public abstract class RestHttpServer implements HttpModule {
     }
 
     private boolean isRequestADocument(String context) {
-        File jailedRoot = new File(documentRoot);
         File checkFile = new File(getDocumentRoot() + context);
-        if (checkFile.exists() && checkFile.isFile()) {
-            if (checkFile.getAbsolutePath().startsWith(jailedRoot.getAbsolutePath())) {
-                return true;
-            }
+        if (!checkFile.exists() || !checkFile.isFile()) {
+            return false;
         }
-        return false;
+        try {
+            // Canonicalise both sides: getAbsolutePath() leaves ".." in place
+            // and does not resolve symlinks, so "web/../secret" and a sibling
+            // directory named "website" both passed the old prefix test.
+            File jailedRoot = new File(getDocumentRoot()).getCanonicalFile();
+            File document = checkFile.getCanonicalFile();
+            String rootPath = jailedRoot.getPath();
+            String documentPath = document.getPath();
+            return documentPath.equals(rootPath)
+                    || documentPath.startsWith(rootPath + File.separator);
+        } catch (IOException e) {
+            logger.log(Level.WARNING, "Could not resolve document path for jail check: {0}", context);
+            return false;
+        }
     }
 
     private Response handleRequestMapping(Map<String, Map<String, RestEndpoint>> pathMapping, RestHttpRequest request) throws Exception {

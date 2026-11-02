@@ -3,6 +3,8 @@ package dk.cintix.application.server.modules.mcp;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import dk.cintix.application.server.infrastructure.ReflectionUtil;
+import dk.cintix.application.server.infrastructure.annotations.McpParam;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -19,6 +21,13 @@ public class McpDispatcher {
         this.registry = registry;
     }
 
+    /**
+     * Handles one JSON-RPC message.
+     *
+     * @return the response object, or {@code null} when the message is a
+     *         JSON-RPC notification (no {@code id}). The transport must answer
+     *         a notification with {@code 202 Accepted} and no body.
+     */
     @SuppressWarnings("unchecked")
     public Map<String, Object> handle(String body) {
         Map<String, Object> req;
@@ -37,6 +46,12 @@ public class McpDispatcher {
 
         if (method == null) {
             return error(-32600, "Invalid Request: missing method", id);
+        }
+
+        // A valid request without an id is a notification: JSON-RPC 2.0 forbids
+        // a response body, so the transport answers 202 and sends nothing.
+        if (!req.containsKey("id")) {
+            return null;
         }
 
         try {
@@ -132,35 +147,124 @@ public class McpDispatcher {
         Parameter[] methodParams = method.getParameters();
 
         if (methodParams.length == 0) {
-            return method.invoke(handler);
+            return invoke(method, handler, new Object[0]);
         }
 
         Object[] arguments = new Object[methodParams.length];
         for (int i = 0; i < methodParams.length; i++) {
             Parameter param = methodParams[i];
-            String paramName = param.getName();
-            Object rawValue = args.get(paramName);
-
-            if (rawValue == null) {
-                arguments[i] = null;
-                continue;
-            }
-
-            String stringValue = String.valueOf(rawValue);
-            try {
-                Object converted = ReflectionUtil.valueFromType(param, stringValue);
-                if (converted != null) {
-                    arguments[i] = converted;
-                } else {
-                    // Fallback for complex types: pass the raw value as-is (e.g. Map, List)
-                    arguments[i] = rawValue;
-                }
-            } catch (Exception e) {
-                arguments[i] = rawValue;
-            }
+            // The schema advertises @McpParam(name = ...), so binding must use
+            // the same name rather than the Java parameter name.
+            String paramName = parameterName(param);
+            arguments[i] = convertArgument(param, args.get(paramName));
         }
 
-        return method.invoke(handler, arguments);
+        return invoke(method, handler, arguments);
+    }
+
+    private static Object invoke(java.lang.reflect.Method method, Object handler, Object[] arguments) throws Exception {
+        try {
+            return method.invoke(handler, arguments);
+        } catch (InvocationTargetException e) {
+            // Report the tool's own failure, not the reflection wrapper.
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception) {
+                throw (Exception) cause;
+            }
+            if (cause instanceof Error) {
+                throw (Error) cause;
+            }
+            throw e;
+        }
+    }
+
+    private static String parameterName(Parameter param) {
+        McpParam annotation = param.getAnnotation(McpParam.class);
+        if (annotation != null && !annotation.name().isEmpty()) {
+            return annotation.name();
+        }
+        return param.getName();
+    }
+
+    /**
+     * Converts a JSON value to the Java parameter type.
+     *
+     * <p>Gson decodes every JSON number to {@code Double}, so the old
+     * {@code String.valueOf(rawValue)} path produced {@code "3.0"} and
+     * {@code Integer.parseInt} failed — then the raw {@code Double} was passed
+     * to {@code method.invoke}, which threw
+     * {@code IllegalArgumentException: argument type mismatch}. Numbers are now
+     * narrowed directly from {@link Number}.</p>
+     */
+    private static Object convertArgument(Parameter param, Object rawValue) throws Exception {
+        if (rawValue == null) {
+            return null;
+        }
+
+        Class<?> type = param.getType();
+        if (type == String.class) {
+            return rawValue instanceof String ? rawValue : String.valueOf(rawValue);
+        }
+        if (type == int.class || type == Integer.class) {
+            return (int) toLong(rawValue);
+        }
+        if (type == long.class || type == Long.class) {
+            return toLong(rawValue);
+        }
+        if (type == short.class || type == Short.class) {
+            return (short) toLong(rawValue);
+        }
+        if (type == byte.class || type == Byte.class) {
+            return (byte) toLong(rawValue);
+        }
+        if (type == double.class || type == Double.class) {
+            return toDouble(rawValue);
+        }
+        if (type == float.class || type == Float.class) {
+            return (float) toDouble(rawValue);
+        }
+        if (type == boolean.class || type == Boolean.class) {
+            if (rawValue instanceof Boolean) {
+                return rawValue;
+            }
+            if (rawValue instanceof Number) {
+                return ((Number) rawValue).doubleValue() != 0;
+            }
+            return Boolean.parseBoolean(String.valueOf(rawValue).trim());
+        }
+        if (type == char.class || type == Character.class) {
+            String text = String.valueOf(rawValue);
+            return text.isEmpty() ? '\0' : text.charAt(0);
+        }
+        if (type.isEnum()) {
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            Object constant = Enum.valueOf((Class<? extends Enum>) type, String.valueOf(rawValue));
+            return constant;
+        }
+
+        // Dates and anything else ReflectionUtil understands.
+        Object converted = ReflectionUtil.valueFromType(param, String.valueOf(rawValue));
+        return converted != null ? converted : rawValue;
+    }
+
+    private static long toLong(Object rawValue) {
+        if (rawValue instanceof Number) {
+            return ((Number) rawValue).longValue();
+        }
+        String text = String.valueOf(rawValue).trim();
+        try {
+            return Long.parseLong(text);
+        } catch (NumberFormatException e) {
+            // Tolerate "3.0" from clients that send an integral value as a float.
+            return (long) Double.parseDouble(text);
+        }
+    }
+
+    private static double toDouble(Object rawValue) {
+        if (rawValue instanceof Number) {
+            return ((Number) rawValue).doubleValue();
+        }
+        return Double.parseDouble(String.valueOf(rawValue).trim());
     }
 
     private Map<String, Object> buildMap(Object... kv) {
@@ -181,9 +285,26 @@ public class McpDispatcher {
         return err;
     }
 
+    /**
+     * Builds a tool-level failure. MCP represents a failing tool as a normal
+     * result with {@code isError: true}, but the message must still reach the
+     * client: the old version returned empty content for every failure, so a
+     * missing name, an unknown tool and an invocation error were
+     * indistinguishable.
+     */
     private Map<String, Object> errorInResult(int code, String message) {
+        Map<String, Object> text = new LinkedHashMap<>();
+        text.put("type", "text");
+        text.put("text", message);
+
+        List<Map<String, Object>> content = new ArrayList<>();
+        content.add(text);
+
+        Map<String, Object> result = buildMap("content", content, "isError", true);
+        result.put("_meta", buildMap("errorCode", code));
+
         Map<String, Object> r = new LinkedHashMap<>();
-        r.put("result", buildMap("content", new ArrayList<>(), "isError", true));
+        r.put("result", result);
         return r;
     }
 }

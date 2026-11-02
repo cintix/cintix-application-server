@@ -301,7 +301,7 @@ public class Response {
             return "Created";
         }
         if (code == 202) {
-            return "Accpeted";
+            return "Accepted";
         }
         if (code == 204) {
             return "No Content";

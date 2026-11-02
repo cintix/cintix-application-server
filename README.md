@@ -43,14 +43,14 @@ public class MyEndpoints {
 | **Server-page rendering** | `.html`/`.htm` files processed through `cintix-html-engine` with request parameter merging |
 | **JSON & text generators** | Built-in `application/json` and `text/plain` model generators — pluggable via `registerModelGenerator()` |
 | **Response caching** | `@Cache`, `@Static`, `@CacheByStatus` annotations with in-memory TTL-based caching |
-| **Request parsing** | Query strings and form fields are URL-decoded (`+` means a space, malformed escapes pass through unchanged). Bodies are assembled by `Content-Length` across as many reads as needed, up to 5 MB — over that the server answers `413` instead of truncating |
+| **Request parsing** | Query strings and form fields are URL-decoded (`+` means a space, malformed escapes pass through unchanged and log at FINE). Multi-value accessors keep every value of `?tag=a&tag=b` (`getQueryStringValues`, `getPostValues`). Form fields are only mined for `application/x-www-form-urlencoded`; JSON and other bodies stay in `getRawPost()`. Bodies are assembled by `Content-Length` across as many reads as needed, up to a configurable limit (default 5 MB) — over that the server answers `413` instead of truncating. Chunked request bodies are parsed and de-chunked (invalid framing → `400`), and `Expect: 100-continue` is answered immediately instead of making the client wait |
 
 ### Production
 
 | Feature | Description |
 |---------|-------------|
 | **Worker-thread pool** | Configurable `ThreadPoolExecutor` — slow endpoints don't block other clients. Back-pressure: `503 Service Unavailable` when queue is full |
-| **Connection pooling** | `PooledDataSource` with dynamic sizing (default 5→20), borrow validation, idle eviction, max lifetime. Hands out logical handles, so the standard `try (Connection c = ds.getConnection())` form returns the connection to the pool |
+| **Connection pooling** | `PooledDataSource` with dynamic sizing (default 5→20), borrow validation, idle eviction, max lifetime. Hands out logical handles, so the standard `try (Connection c = ds.getConnection())` form returns the connection to the pool. Leak diagnostics: an exhausted pool names the longest-held borrows and the stacks that took them; `setLeakDetectionThresholdMs()` adds a warning per over-held connection |
 | **Graceful shutdown** | 6-phase drain: stop accept → drain workers → flush writes → close connections → release resources |
 | **Health checks** | `GET /health` bypasses worker pool. Pluggable probes. Returns `200` (UP) or `503` (DOWN) with JSON status |
 | **Rate limiting** | Opt-in, two-level: global defaults + `@RateLimit` per-endpoint annotation. `requests=0` whitelists an endpoint |
@@ -89,13 +89,14 @@ public class MyEndpoints {
 |---------|-------------|
 | **SSL/TLS** | `SSLContextManager` creates TLS context from JKS keystore |
 | **Certificate management** | `SSLCertificateManager` loads signed certificates |
+| **Static-file jail** | Canonical-path check blocks `..`, symlinks and sibling directories with a shared name prefix from escaping `DOCUMENT_ROOT` |
 
 ### OpenAPI & MCP
 
 | Feature | Description |
 |---------|-------------|
 | **OpenAPI 3.0** | `server.enableOpenApi("My API", "1.0")` — auto-generates spec from registered endpoints. `@ApiDoc`/`@ApiTag`/`@ApiParam`/`@ApiSchema` for metadata. Serves `/api/openapi.json` + Swagger UI at `/api/docs` |
-| **MCP** | `server.enableMcp(handlers...)` — JSON-RPC 2.0 at `POST /api/mcp`. `@McpTool`/`@McpParam` annotations. Auto-discovers tools from endpoint classes. Reports protocol version `2024-11-05`; transport modernization (Streamable HTTP, stateless + session-based) is scheduled for the next release |
+| **MCP** | `server.enableMcp(handlers...)` — JSON-RPC 2.0 at `POST /api/mcp`. `@McpTool`/`@McpParam` annotations. Auto-discovers tools from endpoint classes. Tool failures carry their message; numeric, boolean and enum arguments are coerced to the declared parameter type. Reports protocol version `2024-11-05`; transport modernization (Streamable HTTP, stateless + session-based) is scheduled for the next release |
 
 ```java
 // OpenAPI — one line (cookie auth default)
@@ -148,6 +149,9 @@ server.setMaxQueueSize(500);
 server.setDefaultRequestTimeoutMs(30_000);   // 30 seconds
 server.setIdleReadTimeoutMs(60_000);         // 60 seconds
 server.setDrainTimeoutMs(10_000);            // graceful shutdown drain
+
+// Largest request body before 413 (default 5 MB)
+server.setMaxRequestBytes(10 * 1024 * 1024);
 
 // Health
 server.setHealthPath("/.well-known/health");

@@ -3,8 +3,19 @@ package dk.cintix.application.server.jdbc;
 import dk.cintix.application.server.TestSupport;
 import dk.cintix.application.server.modules.database.services.PooledDataSource;
 import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 public class PooledDataSourceTest {
+
+    private static final Logger POOL_LOGGER = Logger.getLogger(PooledDataSource.class.getName());
 
     public void runAll() throws Exception {
         getConnectionAndReleaseConnection_updatePoolState();
@@ -14,6 +25,8 @@ public class PooledDataSourceTest {
         closeIsIdempotent_releasesOnlyOnce();
         closedHandle_rejectsFurtherUse();
         releaseConnection_acceptsHandleAndPhysical();
+        poolExhaustion_reportsBorrowingThreadAndStack();
+        leakDetection_warnsWithBorrowingStack();
     }
 
     public void tryWithResources_returnsConnectionToPool() throws Exception {
@@ -131,6 +144,99 @@ public class PooledDataSourceTest {
         TestSupport.assertFalse(releasedAgain, "Re-releasing must report failure, not double-add");
         TestSupport.assertEquals(1, dataSource.getIdleCount(), "Idle pool must not gain a duplicate");
         dataSource.shutdown();
+    }
+
+    public void poolExhaustion_reportsBorrowingThreadAndStack() throws Exception {
+        // Arrange — a pool of one whose only connection is never returned
+        MockJdbc.registerDriver();
+        MockJdbc.reset();
+        PooledDataSource dataSource = new PooledDataSource("jdbc:mock:leak-report", "u", "p", 1);
+        dataSource.setMaxPoolSize(1);
+        dataSource.setConnectionTimeoutMs(150);
+        Connection held = dataSource.getConnection();
+
+        // Act — the next borrower times out
+        String message = null;
+        try {
+            dataSource.getConnection();
+        } catch (SQLException e) {
+            message = e.getMessage();
+        }
+
+        // Assert — the failure names who is holding the connection and where
+        TestSupport.assertTrue(message != null, "Expected the second borrow to time out");
+        TestSupport.assertTrue(message.contains("Connection pool exhausted"),
+                "Expected the exhaustion message, got: " + message);
+        TestSupport.assertTrue(message.contains("Connections currently borrowed"),
+                "Exhaustion must report the outstanding borrows, got: " + message);
+        TestSupport.assertTrue(message.contains(Thread.currentThread().getName()),
+                "Report must name the borrowing thread, got: " + message);
+        TestSupport.assertTrue(message.contains("PooledDataSourceTest"),
+                "Report must name the borrowing line, got: " + message);
+        dataSource.shutdown();
+    }
+
+    public void leakDetection_warnsWithBorrowingStack() throws Exception {
+        // Arrange — a short threshold and the fastest eviction sweep allowed
+        MockJdbc.registerDriver();
+        MockJdbc.reset();
+        PooledDataSource dataSource = new PooledDataSource("jdbc:mock:leak-warn", "u", "p", 1);
+        dataSource.setEvictionIntervalMs(1000);
+        dataSource.setLeakDetectionThresholdMs(1);
+
+        final List<LogRecord> records = Collections.synchronizedList(new ArrayList<LogRecord>());
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                records.add(record);
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        handler.setLevel(Level.WARNING);
+        POOL_LOGGER.addHandler(handler);
+
+        Connection held = dataSource.getConnection();
+        try {
+            // Act — wait for the eviction thread to run its leak check
+            String warning = null;
+            long deadline = System.currentTimeMillis() + 4000;
+            while (System.currentTimeMillis() < deadline && warning == null) {
+                Thread.sleep(50);
+                warning = findLeakWarning(records);
+            }
+
+            // Assert — one warning naming the thread and the responsible line
+            TestSupport.assertTrue(warning != null,
+                    "Expected a leak warning within one eviction sweep, got none");
+            TestSupport.assertTrue(warning.contains(Thread.currentThread().getName()),
+                    "Warning must name the borrowing thread, got: " + warning);
+            TestSupport.assertTrue(warning.contains("PooledDataSourceTest"),
+                    "Warning must name the borrowing line, got: " + warning);
+        } finally {
+            POOL_LOGGER.removeHandler(handler);
+            held.close();
+            dataSource.shutdown();
+        }
+    }
+
+    private static String findLeakWarning(List<LogRecord> records) {
+        SimpleFormatter formatter = new SimpleFormatter();
+        synchronized (records) {
+            for (LogRecord record : records) {
+                String text = formatter.formatMessage(record);
+                if (text.contains("Possible connection leak")) {
+                    return text;
+                }
+            }
+        }
+        return null;
     }
 
     public void getConnectionAndReleaseConnection_updatePoolState() throws Exception {

@@ -2,10 +2,15 @@ package dk.cintix.application.server.rest.http.utils;
 
 import dk.cintix.application.server.TestSupport;
 import dk.cintix.application.server.modules.http.server.endpoint.HttpUtil;
+import dk.cintix.application.server.modules.http.server.endpoint.RestHttpRequest;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public class HttpUtilTest {
+
+    private static final String FORM_CONTENT_TYPE = "application/x-www-form-urlencoded";
 
     public void runAll() {
         parseQueryStrings_extractsPathAndParameters();
@@ -13,6 +18,7 @@ public class HttpUtilTest {
         parseQueryStrings_decodesUrlEncodedValues();
         parseQueryStrings_plusIsDecodedAsSpace();
         parseQueryStrings_keepsValuelessKey();
+        parseQueryStrings_multiValueKeepsEveryValue();
         parseHeaderKeys_keepsColonInsideHeaderValue();
         parsePostFields_handlesEmptyAssignedValue();
         parsePostFields_singleLineBodyYieldsFields();
@@ -20,6 +26,11 @@ public class HttpUtilTest {
         parsePostFields_multiLineBodyKeepsRawIntact();
         parsePostFields_decodesUrlEncodedValues();
         parsePostFields_rawIsNotDecoded();
+        parsePostFields_multiValueKeepsEveryValue();
+        parsePostFields_jsonBodyIsNotMinedForFields();
+        parsePostFields_formContentTypeWithCharsetIsMined();
+        restHttpRequest_multiValueAccessorsReturnEveryValue();
+        restHttpRequest_singleValueConstructorDerivesMultiValueView();
         urlDecode_malformedEncodingReturnsRawValue();
         parseContentLength_readsDeclaredLength();
         parseContentLength_isCaseInsensitive();
@@ -32,11 +43,15 @@ public class HttpUtilTest {
      * {@code RestHttpServer.parseRequest} does.
      */
     private static Map<String, String> parseRequestLike(String rawRequest) {
+        return parseRequestLike(rawRequest, null);
+    }
+
+    private static Map<String, String> parseRequestLike(String rawRequest, Map<String, List<String>> values) {
         String[] lines = rawRequest.split("\n");
         Map<String, String> headers = new LinkedHashMap<>();
         Map<String, String> fields = new LinkedHashMap<>();
         int linesProcessed = HttpUtil.parseHeaderKeys(lines, headers, 0);
-        HttpUtil.parsePostFields(linesProcessed, lines, fields);
+        HttpUtil.parsePostFields(linesProcessed, lines, headers.get("CONTENT-TYPE"), fields, values);
         return fields;
     }
 
@@ -211,6 +226,111 @@ public class HttpUtilTest {
         // Assert
         TestSupport.assertEquals(body, fields.get("!RAW"),
                 "!RAW must stay byte-for-byte; decoding it would corrupt JSON payloads");
+    }
+
+    public void parseQueryStrings_multiValueKeepsEveryValue() {
+        // Arrange — a repeated key, which the single-value map collapses
+        Map<String, String> query = new LinkedHashMap<>();
+        Map<String, List<String>> values = new LinkedHashMap<>();
+
+        // Act
+        HttpUtil.parseQueryStrings("/items?tag=a&tag=b&page=2", query, values);
+
+        // Assert — last-wins behaviour is preserved for existing callers
+        TestSupport.assertEquals("b", query.get("tag"),
+                "Single-value map must keep its last-wins behaviour");
+        // …while the multi-value view keeps every value, in order
+        TestSupport.assertEquals(Arrays.asList("a", "b"), values.get("tag"),
+                "Repeated query values were collapsed");
+        TestSupport.assertEquals(Arrays.asList("2"), values.get("page"),
+                "Single query value missing from multi-value view");
+    }
+
+    public void parsePostFields_multiValueKeepsEveryValue() {
+        // Arrange — the same field submitted twice in one form body
+        Map<String, List<String>> values = new LinkedHashMap<>();
+        String rawRequest = "POST /submit HTTP/1.1\r\n"
+                + "Host: 127.0.0.1\r\n"
+                + "Content-Type: application/x-www-form-urlencoded\r\n"
+                + "\r\n"
+                + "tag=a&tag=b";
+
+        // Act
+        Map<String, String> fields = parseRequestLike(rawRequest, values);
+
+        // Assert
+        TestSupport.assertEquals("b", fields.get("tag"), "Single-value map must stay last-wins");
+        TestSupport.assertEquals(Arrays.asList("a", "b"), values.get("tag"),
+                "Repeated form values were collapsed");
+    }
+
+    public void parsePostFields_jsonBodyIsNotMinedForFields() {
+        // Arrange — a JSON body containing '=' is not a form
+        String body = "{\"a\":\"x=1\"}";
+        String rawRequest = "POST /submit HTTP/1.1\r\n"
+                + "Host: 127.0.0.1\r\n"
+                + "Content-Type: application/json\r\n"
+                + "\r\n"
+                + body;
+
+        // Act
+        Map<String, String> fields = parseRequestLike(rawRequest);
+
+        // Assert — no bogus field named 'a'; the body is available as !RAW
+        TestSupport.assertFalse(fields.containsKey("a"),
+                "A JSON body must not be mined for form fields");
+        TestSupport.assertEquals(body, fields.get("!RAW"), "!RAW must still carry the body");
+    }
+
+    public void parsePostFields_formContentTypeWithCharsetIsMined() {
+        // Arrange — browsers append a charset parameter to the form type
+        String rawRequest = "POST /submit HTTP/1.1\r\n"
+                + "Host: 127.0.0.1\r\n"
+                + "Content-Type: application/x-www-form-urlencoded; charset=UTF-8\r\n"
+                + "\r\n"
+                + "name=alice";
+
+        // Act
+        Map<String, String> fields = parseRequestLike(rawRequest);
+
+        // Assert
+        TestSupport.assertEquals("alice", fields.get("name"),
+                "A charset parameter must not stop form parsing");
+    }
+
+    public void restHttpRequest_multiValueAccessorsReturnEveryValue() {
+        // Arrange
+        Map<String, String> query = new LinkedHashMap<>();
+        Map<String, List<String>> queryValues = new LinkedHashMap<>();
+        Map<String, String> post = new LinkedHashMap<>();
+        Map<String, List<String>> postValues = new LinkedHashMap<>();
+        HttpUtil.parseQueryStrings("/items?tag=a&tag=b", query, queryValues);
+        HttpUtil.parsePostFields(0, new String[]{"x=1&x=2"}, FORM_CONTENT_TYPE, post, postValues);
+
+        RestHttpRequest request = new RestHttpRequest(new LinkedHashMap<String, String>(),
+                query, post, queryValues, postValues, null, "POST", "/items", "x=1&x=2");
+
+        // Act / Assert
+        TestSupport.assertEquals(Arrays.asList("a", "b"), request.getQueryStringValues("tag"),
+                "getQueryStringValues must return every query value");
+        TestSupport.assertEquals(Arrays.asList("1", "2"), request.getPostValues("x"),
+                "getPostValues must return every form value");
+        TestSupport.assertTrue(request.getQueryStringValues("missing").isEmpty(),
+                "An absent query key must yield an empty list, not null");
+        TestSupport.assertTrue(request.getPostValues("missing").isEmpty(),
+                "An absent form key must yield an empty list, not null");
+    }
+
+    public void restHttpRequest_singleValueConstructorDerivesMultiValueView() {
+        // Arrange — old constructor, as used by tests and third-party code
+        Map<String, String> query = new LinkedHashMap<>();
+        query.put("page", "2");
+        RestHttpRequest request = new RestHttpRequest(new LinkedHashMap<String, String>(),
+                query, new LinkedHashMap<String, String>(), null, "GET", "/items", "");
+
+        // Act / Assert — a single value is still visible through the new API
+        TestSupport.assertEquals(Arrays.asList("2"), request.getQueryStringValues("page"),
+                "Legacy construction must derive a single-value multi-value view");
     }
 
     public void urlDecode_malformedEncodingReturnsRawValue() {
