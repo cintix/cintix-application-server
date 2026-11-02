@@ -21,6 +21,7 @@ public class ReleaseScriptTest {
 
     public void runAll() {
         releaseScript_writesVersionBeforeBuilding();
+        releaseScript_doesNotSwallowPushFailures();
         builtJar_serverHeaderMatchesSource();
     }
 
@@ -62,6 +63,32 @@ public class ReleaseScriptTest {
                     + "embeds the previous release's version in its Server: header");
         } catch (Exception e) {
             throw new RuntimeException("releaseScript_writesVersionBeforeBuilding failed", e);
+        }
+    }
+
+    public void releaseScript_doesNotSwallowPushFailures() {
+        // Arrange
+        File root = projectRoot();
+        TestSupport.assertTrue(root != null, "Could not locate release.sh from the working directory");
+
+        try {
+            String script = read(new File(root, "release.sh"));
+
+            // Act — isolate the line that publishes the release commit
+            int pushIndex = script.indexOf("git push origin main");
+            TestSupport.assertTrue(pushIndex != -1, "release.sh no longer pushes main");
+
+            int lineEnd = script.indexOf('\n', pushIndex);
+            String pushLine = script.substring(pushIndex, lineEnd == -1 ? script.length() : lineEnd);
+
+            // Assert — a swallowed error let the tag and the GitHub release be
+            // published while the commit never reached the remote.
+            TestSupport.assertFalse(pushLine.contains("2>/dev/null"),
+                    "release.sh hides git push errors: " + pushLine);
+            TestSupport.assertFalse(pushLine.contains("|| true"),
+                    "release.sh ignores a failed git push: " + pushLine);
+        } catch (Exception e) {
+            throw new RuntimeException("releaseScript_doesNotSwallowPushFailures failed", e);
         }
     }
 

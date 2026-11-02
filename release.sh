@@ -172,7 +172,11 @@ git_commit_tag_push() {
     git tag -a "v$NEW_VERSION" -m "v$NEW_VERSION — $RELEASE_DESC"
 
     info "Pushing commit + tag..."
-    git push origin main 2>/dev/null || git push origin master 2>/dev/null || true
+    # Errors must stay visible: with "2>/dev/null || true" a failed push went
+    # unnoticed while the tag and the GitHub release were still published, so
+    # the release existed without its commit on the remote. A failing push now
+    # aborts the script (set -e) before the tag is created.
+    git push origin main || git push origin master
     git push origin "v$NEW_VERSION"
 
     info "Commit + tag v$NEW_VERSION pushed"
